@@ -5,8 +5,9 @@ puzzle in the spirit of the old DOS *Color Lines*.
 
 ## Status
 
-`MarmorEngine`, the game logic, is ported from the web version's
-`src/game/engine.ts`. The SwiftUI app target does not exist yet.
+`MarmorEngine` (game logic) and `MarmorAudio` (sound) are ported from the web
+version's `src/game/engine.ts` and `src/audio/sound.ts`. The SwiftUI app target
+does not exist yet.
 
 > **Not yet compiled.** This was written on a Mac with no working Swift
 > toolchain, so it has never been through a compiler. Expect to fix a few
@@ -22,11 +23,22 @@ Sources/MarmorEngine/
   Engine.swift      BFS pathfinding, flood fill, line detection, scoring
   Spawning.swift    weighted color choice, threat detection, spawn placement
 
+Sources/MarmorAudio/
+  Waveform.swift    oscillator shapes, polyBLEP anti-aliasing
+  Biquad.swift      RBJ lowpass/highpass, matching Web Audio's filter design
+  Synth.swift       envelopes, blip and noise-burst rendering, mixing
+  Sfx.swift         the eight game sounds, each rendered to a buffer
+  SoundPlayer.swift AVAudioEngine playback, buffer cache, mute
+
 Tests/MarmorEngineTests/
   TestSupport.swift  seeded PRNG + board-building helpers
   EngineTests.swift  pure logic
   SpawningTests.swift  the blocking "AI"
   FuzzTests.swift    10k random legal moves, and path/reachability agreement
+
+Tests/MarmorAudioTests/
+  SynthTests.swift  envelopes, waveforms, filter response, pitch sweeps
+  SfxTests.swift    per-effect duration, level, and well-formedness
 ```
 
 ```
@@ -58,3 +70,30 @@ available, or forbids the original approach outright:
   `-1`, which is a bad failure mode to inherit.
 - **CSS layout constants are dropped** (`CELL_SIZE_PX` and friends) — SwiftUI
   does its own layout, so there's nothing for the view to match.
+
+## Audio
+
+Same principle as the web version: no audio files, everything synthesized at
+runtime. The approach differs though, because Web Audio and AVAudioEngine are
+built for different things.
+
+Web Audio is a live node graph — the web version creates oscillators, gains and
+filters per sound, wires them to the destination, and schedules parameter
+automation. AVAudioEngine can do that, but attaching and detaching nodes
+mid-playback is expensive and prone to glitching. So instead each effect is
+**rendered offline into a PCM buffer once, cached, and replayed** through a
+pool of twelve `AVAudioPlayerNode`s so overlapping sounds don't cut each other
+off. Multi-part effects that the web version staggers with `setTimeout` — the
+clear chime's voices, the win fanfare's notes, the king's landing thud — are
+mixed into a single buffer at the right sample offsets.
+
+The payoff is that all the actual sound design is pure functions from
+parameters to `[Float]`, with no reference to AVFoundation, so it's unit-
+testable without an audio device. Two other deliberate choices:
+
+- **PolyBLEP band-limiting** on the square and sawtooth oscillators. Web
+  Audio's built-in oscillators are band-limited; a naive `phase < 0.5 ? 1 : -1`
+  is not, and it aliases audibly on the brighter blips.
+- **`AVAudioSession` is `.ambient` with `.mixWithOthers`**, so the game
+  respects the silent switch and doesn't stop whatever the player is already
+  listening to. The web version has no equivalent concern.
