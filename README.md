@@ -17,11 +17,13 @@ does not exist yet.
 
 ```
 Sources/MarmorEngine/
-  Constants.swift   board size, palette size, line minimum, scoring knobs
+  Constants.swift   board size, palette ceiling, line minimum, King's target
   Cell.swift        a board coordinate
   Board.swift       9x9 field, flat-backed, value semantics
   Engine.swift      BFS pathfinding, flood fill, line detection, scoring
   Spawning.swift    weighted color choice, threat detection, spawn placement
+  Levels.swift      the eight-round difficulty ladder, as data
+  Score.swift       Hall of Pretenders ranking (progress, sort key, ordering)
 
 Sources/MarmorAudio/
   Waveform.swift    oscillator shapes, polyBLEP anti-aliasing
@@ -33,7 +35,9 @@ Sources/MarmorAudio/
 Tests/MarmorEngineTests/
   TestSupport.swift  seeded PRNG + board-building helpers
   EngineTests.swift  pure logic
-  SpawningTests.swift  the blocking "AI"
+  SpawningTests.swift  the blocking "AI", color weighting, the affinity dial
+  LevelsTests.swift  ladder guardrails, incl. the one-dial-per-round rule
+  ScoreTests.swift   ranking, progress, sort-key packing
   FuzzTests.swift    10k random legal moves, and path/reachability agreement
 
 Tests/MarmorAudioTests/
@@ -70,6 +74,28 @@ available, or forbids the original approach outright:
   `-1`, which is a bad failure mode to inherit.
 - **CSS layout constants are dropped** (`CELL_SIZE_PX` and friends) — SwiftUI
   does its own layout, so there's nothing for the view to match.
+- **`score.ts`'s free functions became properties** — `progressOf(entry)` reads
+  better as `entry.progress`, `isBetterRun(a, b)` as `a.isBetter(than: b)`.
+  Ranking also gets a final tie-break on `id`, since the web version leans on
+  JavaScript's stable sort for entries identical down to the timestamp and
+  Swift's sort is not stable.
+- **`assignSpawnCells` keeps labelled default parameters** rather than the
+  `SpawnOptions` object the web version adopted. That object exists to avoid a
+  run of positional arguments, which Swift's argument labels already solve.
+
+### Two web modules with no Swift counterpart
+
+- **`rng.ts` is not ported.** It exists because browser privacy extensions
+  shim `Math.random` to return degenerate values, which silently wrecks a
+  spawn picker. Swift has no global to shim, and this port already threads a
+  `RandomNumberGenerator` through every random-dependent function, so the
+  problem it solves cannot occur here.
+- **`progress.ts` is not ported yet.** Its whole design rests on
+  `sessionStorage` semantics — survives a reload, dies with the tab — to tell
+  "iOS evicted my backgrounded tab" apart from "I left." iOS has no equivalent
+  boundary; the same distinction needs scene-phase notifications and a real
+  freshness check against a file or `UserDefaults`. Porting it line by line
+  would carry over reasoning that doesn't hold. It belongs with the app layer.
 
 ## Audio
 

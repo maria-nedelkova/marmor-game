@@ -58,6 +58,72 @@ struct WeightedRandomColorTests {
             #expect(color >= 0 && color < Marmor.colors)
         }
     }
+
+    @Test("never returns a color outside the level's range")
+    func respectsColorCount() {
+        var board = Board()
+        // A color from outside the range already sitting on the board (as
+        // after a level change) must not drag the picker past `colorCount`.
+        board.place([(0, 0), (0, 1), (0, 2), (0, 3)], 6)
+        var rng = SeededGenerator(seed: 5)
+        for _ in 0..<500 {
+            let color = board.weightedRandomColor(colorCount: 5, using: &rng)
+            #expect(color >= 0 && color < 5)
+        }
+    }
+
+    @Test("affinity 0 ignores the board entirely, unlike affinity 1")
+    func affinityDial() {
+        var board = Board()
+        // 40 marbles of color 0 — at affinity 1 that dominates the weighting;
+        // at affinity 0 it should count for nothing.
+        for r in 0..<5 {
+            for c in 0..<8 { board[r, c] = 0 }
+        }
+
+        let runs = 3000
+        var rng = SeededGenerator(seed: 6)
+        var biased = 0
+        var flat = 0
+        for _ in 0..<runs {
+            if board.weightedRandomColor(affinity: 1, using: &rng) == 0 { biased += 1 }
+            if board.weightedRandomColor(affinity: 0, using: &rng) == 0 { flat += 1 }
+        }
+
+        // Asserted against the formula rather than hard-coded shares, which
+        // would silently encode whatever `colorSmoothing` happens to be.
+        let expectedBiased = (40 + colorSmoothing) / (40 + Double(Marmor.colors) * colorSmoothing)
+        let expectedFlat = 1 / Double(Marmor.colors)
+        #expect(abs(Double(biased) / Double(runs) - expectedBiased) < 0.08)
+        #expect(abs(Double(flat) / Double(runs) - expectedFlat) < 0.05)
+        // The point of the dial: clustering must be much stronger at 1 than 0.
+        #expect(biased > flat * 3)
+    }
+
+    @Test("an absent color keeps a usable chance on a busy board")
+    func absentColorStaysReachable() {
+        // The bug this guards: with too small a smoothing constant, a color
+        // that falls behind effectively never returns. On a realistic
+        // 47-marble board an absent color must stay well above ~1 in 50 per
+        // spawn, or it takes ~18 turns to reappear and the board looks stuck
+        // on three colors.
+        var board = Board()
+        var placed = 0
+        for r in 0..<Marmor.size {
+            for c in 0..<Marmor.size where placed < 47 {
+                board[r, c] = placed % 3  // three colors hog the board
+                placed += 1
+            }
+        }
+
+        let runs = 20_000
+        var rng = SeededGenerator(seed: 7)
+        var absent = 0
+        for _ in 0..<runs {
+            if board.weightedRandomColor(using: &rng) == 7 { absent += 1 }
+        }
+        #expect(Double(absent) / Double(runs) > 0.03)
+    }
 }
 
 @Suite("findTopThreats")
@@ -182,6 +248,17 @@ struct AssignSpawnCellsTests {
         var rng = SeededGenerator(seed: 14)
         let result = nearlyCompleteRow()
             .assignSpawnCells(colors: [2], enableBlocking: false, using: &rng)
+        #expect(!result.blocked)
+    }
+
+    @Test("a threat in a color outside the level's range is not blocked")
+    func ignoresOutOfRangeThreats() {
+        var board = Board()
+        // Color 6 exists on the board but this level only plays colors 0-4, so
+        // the threat scan must not see it and must not aim a spawn at it.
+        board.place([(4, 2), (4, 3), (4, 4), (4, 5)], 6)
+        var rng = SeededGenerator(seed: 15)
+        let result = board.assignSpawnCells(colors: [2], colorCount: 5, using: &rng)
         #expect(!result.blocked)
     }
 

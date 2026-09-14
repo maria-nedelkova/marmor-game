@@ -49,10 +49,17 @@ public struct Board: Equatable, Sendable {
     }
 
     /// Count of each color currently on the board, indexed by color.
-    public func colorCounts() -> [Int] {
-        var counts = Array(repeating: 0, count: Marmor.colors)
+    ///
+    /// `colorCount` is how many colors are in play this level (see
+    /// `LevelConfig.colors`); it defaults to the full palette so the engine is
+    /// still usable — and testable — without a level in hand.
+    public func colorCounts(colorCount: Int = Marmor.colors) -> [Int] {
+        var counts = Array(repeating: 0, count: colorCount)
         for cell in storage {
-            if let cell { counts[cell] += 1 }
+            // A color outside the current level's range can only appear if a
+            // board outlived a level change; ignoring it beats writing past
+            // the end of the counts array.
+            if let cell, cell < colorCount { counts[cell] += 1 }
         }
         return counts
     }

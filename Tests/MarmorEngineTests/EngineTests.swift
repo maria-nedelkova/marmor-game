@@ -164,6 +164,19 @@ struct ColorCountsTests {
         #expect(counts[5] == 1)
         #expect(counts[0] == 0)
     }
+
+    @Test("ignores colors outside the level's range instead of overflowing")
+    func ignoresOutOfRangeColors() {
+        var board = Board()
+        // A board that outlived a level change can hold colors the current
+        // level doesn't use. Counting them would write past the array's end.
+        board.place([(0, 0), (0, 1)], 7)
+        board.place([(1, 0)], 2)
+        let counts = board.colorCounts(colorCount: 5)
+        #expect(counts.count == 5)
+        #expect(counts[2] == 1)
+        #expect(counts.reduce(0, +) == 1)
+    }
 }
 
 @Suite("longestRunThrough")

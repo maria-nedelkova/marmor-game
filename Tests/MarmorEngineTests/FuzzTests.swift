@@ -51,7 +51,8 @@ struct FuzzTests {
 
             let matches = board.findLinesThrough(to)
             if matches.isEmpty {
-                let colors = board.weightedRandomColors(Marmor.spawnCount, using: &rng)
+                // Round 1's spawn count — the classic three a turn.
+                let colors = board.weightedRandomColors(levels[0].spawnCount, using: &rng)
                 let spawn = board.assignSpawnCells(colors: colors, using: &rng)
                 #expect(spawn.cells.count == Set(spawn.cells).count)
                 for (cell, color) in zip(spawn.cells, colors) {

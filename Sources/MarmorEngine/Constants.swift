@@ -5,23 +5,17 @@ public enum Marmor {
     /// Board is `size` x `size`.
     public static let size = 9
 
-    /// Number of distinct marble colors.
-    public static let colors = 7
+    /// Palette size — the number of marble colors the renderer defines. How
+    /// many are actually in play is per-level (`LevelConfig.colors`); this is
+    /// the ceiling, not the game setting. The classic game (and round 1) uses
+    /// the first seven; the eighth exists only for the later rounds.
+    public static let colors = 8
 
     /// Marbles needed in a row before a line pops.
     public static let lineMin = 5
 
-    /// Marbles that drop each turn the player fails to clear a line.
-    public static let spawnCount = 3
-
-    /// The King's fixed score — the Pretender wins by reaching or beating it.
+    /// The King's score, in every round. Deliberately a constant rather than a
+    /// per-level field: the target never varies, so the ladder gets harder by
+    /// making 100 points harder to reach, not by moving the finish line.
     public static let kingScore = 100
-
-    /// A spawn only blocks the player's most advanced line once it's at least this long.
-    public static let blockMinRunLength = 3
-
-    /// Chance, per non-initial spawn, that blocking is even considered this turn.
-    /// A flat probability rather than a fixed cooldown so it doesn't fall into
-    /// an obvious every-Nth-turn pattern.
-    public static let blockProbability = 0.35
 }
