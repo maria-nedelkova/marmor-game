@@ -1,7 +1,12 @@
-# marmor-ios
+# marmor-game
 
-Native iOS port of [Marmor](../marmor) — a King-vs-Pretender marble-lines
-puzzle in the spirit of the old DOS *Color Lines*.
+Mobile build of [Marmor](../marmor) — a King-vs-Pretender marble-lines puzzle
+in the spirit of the old DOS *Color Lines*. Godot, targeting iOS and Android
+from one project.
+
+> Renamed from `marmor-ios`, which stopped being true when the target became
+> both stores. GitHub redirects the old remote URL, so existing clones keep
+> working until they `git remote set-url`.
 
 ## Status
 

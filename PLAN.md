@@ -151,10 +151,10 @@ repo that survives.
 
 ### This repo, renamed — not a new one
 
-Rename `marmor-ios` (to `marmor-game` or `marmor-mobile`) rather than
-starting fresh. GitHub redirects the old remote URL, so nothing breaks, and
-this file keeps its history — which is now the record of these decisions.
-A new repo strands both.
+Renamed from `marmor-ios` to **`marmor-game`** rather than starting fresh.
+GitHub redirects the old remote URL, so nothing breaks, and this file keeps
+its history — which is now the record of these decisions. A new repo would
+have stranded both.
 
 **Do not delete the Swift package yet.** It gets read constantly during the
 port, per the section above. Prune it once the GDScript engine is green and
