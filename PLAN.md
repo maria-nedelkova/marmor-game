@@ -118,19 +118,60 @@ grounds that it preserves `MarmorEngine`. That was written before cross-
 platform was settled as a requirement. It is the wrong call once Android is in
 scope.)
 
+### Port from the TypeScript, not from the Swift
+
+The web repo is the source to translate from. Two reasons, both load-bearing:
+
+- **It is complete.** The Swift port has no tool system — no `tools.ts`, no
+  `bombAt`, no `shuffleBoardColors`. Porting from Swift means porting from
+  TypeScript anyway for that half, in a second pass, after the idioms have
+  already been bent once.
+- **It is verified.** 134 tests, 1 575 assertions, and it has been played.
+  The Swift port **has never been through a compiler** (its own README says
+  so). Using unverified code as the specification lets its mistakes
+  propagate silently into GDScript, with no way to tell a porting bug from
+  an inherited one.
+
+**The Swift port still earns its keep — as notes, not as source.** Its
+README's "Notable differences" section is exactly the list of traps in
+translating *out of JavaScript idioms*, and GDScript hits the same ones:
+
+- JS `sort` is stable; GDScript's `sort_custom` is not. `findTopThreats`
+  needs an explicit total order or which line the spawner blocks varies run
+  to run.
+- `Math.random()` is a global the web tests monkey-patch. GDScript has no
+  such global, so randomness wants injecting — the same answer Swift reached.
+- Maps keyed by `"r,c"` strings want a real hashable cell type.
+- `findIndex`/`splice` on `-1` silently grabs the *last* free cell. The
+  Swift port refused to inherit that; so should this one.
+
+So: **TypeScript for what the code does, the Swift README for how not to
+mistranslate it.** That is a real head start, and it is the part of this
+repo that survives.
+
+### This repo, renamed — not a new one
+
+Rename `marmor-ios` (to `marmor-game` or `marmor-mobile`) rather than
+starting fresh. GitHub redirects the old remote URL, so nothing breaks, and
+this file keeps its history — which is now the record of these decisions.
+A new repo strands both.
+
+**Do not delete the Swift package yet.** It gets read constantly during the
+port, per the section above. Prune it once the GDScript engine is green and
+its tests pass — not before.
+
 ### Why rewriting the engine is a smaller loss than it sounds
 
 The engine is about 400 lines of pure logic — BFS pathfinding, flood fill,
 line detection, scoring, weighted spawn choice. It is not a system to dread
 rebuilding.
 
-And the Swift port's value was never that it runs. It is **carefully reasoned,
-documented, and covered by a test suite that describes exactly what correct
-behaviour is** — including the subtle parts (the blocking AI's tie-breaks, the
-colour-affinity dial, the ladder's one-dial-per-round rule). Treat it as an
-executable specification and port from it. That is a far easier job than
-porting from scratch, and the tests come with it: translate those first, then
-make them pass.
+And the behaviour is already pinned down twice over: by the web suite that
+actually runs (134 tests, 1 575 assertions), and by the Swift port's written
+reasoning about where a translation goes wrong. Between them the subtle parts
+— the blocking AI's tie-breaks, the colour-affinity dial, the ladder's
+one-dial-per-round rule — are documented rather than folklore. Translate the
+tests first, then make them pass.
 
 Do not pick on this table alone. All three export stories move, and this was
 written without being able to test any of them.
@@ -166,10 +207,6 @@ framework-agnostic. The PRNG gets ported to GDScript either way.
 > committing. That is a two-minute look at their repos, and it beats this
 > file — written at a remove, and without being able to run either.
 
-> **Repo name.** `marmor-ios` becomes a misnomer the moment this is Godot —
-> it will build for Android too. Worth renaming to `marmor-game` or
-> `marmor-mobile` at some point; left alone for now because it moves the git
-> remote.
 
 ---
 
@@ -367,12 +404,13 @@ SwiftGodot is viable — a failing build there is not evidence about Godot.
    anything is built on top of it. Doing both now is the point — the whole
    case for Godot is that one codebase ships to two stores, and that claim
    should be tested while it is cheap to act on.
-2. Install GdUnit4 (see section 2) and port the engine tests first, then
-   make them pass. The Swift suite in
-   `Tests/MarmorEngineTests/` is the specification; translating the
-   assertions before the implementation is what keeps the subtle behaviour
-   (blocking tie-breaks, colour affinity, the ladder guardrails) from
-   quietly changing in the rewrite.
+2. Install GdUnit4 (see section 2) and port the engine tests first, then make
+   them pass. Translate from the **web** suite (`src/game/*.test.ts` — 134
+   tests, and the only one that has ever run), reading the Swift port's
+   README and `Tests/MarmorEngineTests/` alongside for the translation traps.
+   Writing the assertions before the implementation is what keeps the subtle
+   behaviour (blocking tie-breaks, colour affinity, the ladder guardrails)
+   from quietly changing in the rewrite.
 3. Level/world data as one plain-data file: names, kings, targets,
    multipliers, unlock rules.
 4. The level map screen, against local storage.

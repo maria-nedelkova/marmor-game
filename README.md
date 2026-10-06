@@ -19,6 +19,12 @@ The engine is one feature behind the web version — the six-tool system and its
 two board operations (`bombAt`, `shuffleBoardColors`). Everything else that
 landed on web since is presentation. PLAN.md section 6 has the detail.
 
+Because of that gap, and because this Swift has never compiled, **the port
+source is the web repo's TypeScript, not this package.** What this package
+contributes is its reasoning: the "Notable differences" section below is the
+list of traps in translating out of JavaScript idioms, and they apply just as
+well to GDScript. Keep it until the Godot engine's tests are green.
+
 > **Not yet compiled.** This was written on a Mac with no working Swift
 > toolchain, so it has never been through a compiler. Expect to fix a few
 > things on the first `swift test`.
