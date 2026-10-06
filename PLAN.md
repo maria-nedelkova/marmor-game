@@ -42,6 +42,23 @@ Rejected, and why:
   keeps the CSS, but it is the prototype shipped as the product, and it caps
   how good this can look.
 
+### One repo, both stores
+
+This is the other half of the win, and it is real: **one Godot project ships
+to iOS and Android.** One codebase, one set of scenes and assets, an export
+preset per platform. Native would have meant Swift *and* Kotlin — two
+codebases and every feature built twice.
+
+Three things that stay per-platform anyway:
+
+- **iOS still needs a Mac.** Godot exports an Xcode project; signing and
+  submitting require Xcode on a current macOS. Android builds from anything.
+  One repo, but not one machine.
+- Store metadata, icons, splash screens, signing and permissions. Config,
+  not code.
+- Third-party SDKs — ads, analytics, IAP — are where per-platform plugin
+  work creeps back in.
+
 The cost of this decision is the engine rewrite. That is the next section.
 
 ---
@@ -50,26 +67,51 @@ The cost of this decision is the engine rewrite. That is the next section.
 
 `Sources/MarmorEngine` and `Sources/MarmorAudio` are a careful, well-tested
 port of the web engine. Godot does not run Swift natively, so there is a real
-decision here, and it should be made **on day one with a hello-world export to
-a device**, not after the game is built.
+decision here, and it should be settled **on day one by exporting a
+hello-world to both an iOS and an Android device**, not after a game is built
+on top of it.
 
 Three options, honestly:
 
-| Option | Keeps the Swift port | Export path |
-| --- | --- | --- |
-| **GDScript** | No — third rewrite of the engine | Best supported, least friction |
-| **C# (.NET)** | No — but a C# port from Swift is mechanical | Supported, historically the rockiest; verify early |
-| **SwiftGodot** (GDExtension) | Yes — `MarmorEngine` used nearly as-is | Smallest ecosystem, least-trodden path |
+| Option | Keeps the Swift port | iOS | Android |
+| --- | --- | --- | --- |
+| **GDScript** | No — third rewrite of the engine | Best supported | Best supported |
+| **C# (.NET)** | No — but a Swift→C# port is mechanical | Supported; verify early | Supported; verify early |
+| **SwiftGodot** (GDExtension) | Yes — `MarmorEngine` nearly as-is | Workable, less-trodden | **Weak — see below** |
 
-My recommendation: **try SwiftGodot first, time-boxed.** The engine plus its
-test suite is the most valuable thing in this repo, and SwiftGodot is the only
-option that keeps it. But prove the export to a real device before committing
-— if it fights back, fall to GDScript and treat `MarmorEngine` as an
-executable specification to port from rather than as code to run. It is good
-enough to serve as that.
+**Recommendation: GDScript.** C# if you specifically want static typing and a
+mechanical translation from the Swift, but prove its mobile export on day one,
+because that has historically been the rockier path.
 
-Do not pick based on this table alone. All three export stories have moved
-recently and this was written without being able to test any of them.
+### Why not SwiftGodot, despite it being the only option that keeps the engine
+
+Android is the reason. SwiftGodot reaches Android through Swift's Android
+toolchain, which is immature, and stacking that on GDExtension-on-Android is
+two experimental things propping each other up. For an iOS-only game it would
+be a reasonable bet. For iOS **and** Android it undermines the single biggest
+reason to pick Godot at all — one codebase, both platforms.
+
+(An earlier draft of this file recommended trying SwiftGodot first, on the
+grounds that it preserves `MarmorEngine`. That was written before cross-
+platform was settled as a requirement. It is the wrong call once Android is in
+scope.)
+
+### Why rewriting the engine is a smaller loss than it sounds
+
+The engine is about 400 lines of pure logic — BFS pathfinding, flood fill,
+line detection, scoring, weighted spawn choice. It is not a system to dread
+rebuilding.
+
+And the Swift port's value was never that it runs. It is **carefully reasoned,
+documented, and covered by a test suite that describes exactly what correct
+behaviour is** — including the subtle parts (the blocking AI's tie-breaks, the
+colour-affinity dial, the ladder's one-dial-per-round rule). Treat it as an
+executable specification and port from it. That is a far easier job than
+porting from scratch, and the tests come with it: translate those first, then
+make them pass.
+
+Do not pick on this table alone. All three export stories move, and this was
+written without being able to test any of them.
 
 > **Repo name.** `marmor-ios` becomes a misnomer the moment this is Godot —
 > it will build for Android too. Worth renaming to `marmor-game` or
@@ -267,10 +309,16 @@ SwiftGodot is viable — a failing build there is not evidence about Godot.
 
 ## 7. Suggested order
 
-1. Hello-world Godot export to a real device, in whichever language you mean
-   to use. Settle section 2 before anything else is built on top of it.
-2. `swift test` if SwiftGodot is still in play — find out what the uncompiled
-   port actually costs.
+1. Hello-world Godot export to **both** a real iOS device and a real Android
+   device, in whichever language you mean to use. Settle section 2 before
+   anything is built on top of it. Doing both now is the point — the whole
+   case for Godot is that one codebase ships to two stores, and that claim
+   should be tested while it is cheap to act on.
+2. Port the engine tests first, then make them pass. The Swift suite in
+   `Tests/MarmorEngineTests/` is the specification; translating the
+   assertions before the implementation is what keeps the subtle behaviour
+   (blocking tie-breaks, colour affinity, the ladder guardrails) from
+   quietly changing in the rewrite.
 3. Level/world data as one plain-data file: names, kings, targets,
    multipliers, unlock rules.
 4. The level map screen, against local storage.
@@ -282,7 +330,7 @@ SwiftGodot is viable — a failing build there is not evidence about Godot.
 
 ## Open questions
 
-- Which language, and does SwiftGodot survive a device export?
+- GDScript or C#? (SwiftGodot is ruled out by Android — see section 2.)
 - Replays: sum-of-bests, or sum-of-bests plus a first-clear bonus?
 - Exact score curve — the table in section 3 is a proposal.
 - King avatars up front, or a placeholder pass first?
