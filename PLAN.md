@@ -83,6 +83,28 @@ Three options, honestly:
 mechanical translation from the Swift, but prove its mobile export on day one,
 because that has historically been the rockier path.
 
+Three things that get wrongly attributed to this choice, and one that doesn't:
+
+- **One repo for both stores is Godot, not GDScript.** Every option above
+  gives you that. GDScript just reaches it with the least export friction —
+  no .NET runtime to bundle, smaller binaries, fewer moving parts.
+- **The looks are the renderer, not the language.** Bloom, shaders,
+  particles and parallax are `WorldEnvironment` and shader code; they read
+  identically from C#. Choosing GDScript costs nothing visually.
+- **Performance is a non-issue.** GDScript is slower than C#, which would
+  matter for a heavy simulation. This game runs BFS on an 81-cell board,
+  turn-based. It could be written in almost anything.
+- **Testing is the real trade.** `swift test` and XCTest are excellent;
+  GDScript means a community addon — GUT or GdUnit4. Both work, both are
+  less polished. Pick one on day one, because the plan below depends on
+  porting the test suite *first*.
+
+One thing to do deliberately: **use GDScript's static typing everywhere**
+(`var n: int`, typed parameters and returns). It is optional in Godot 4 and
+off by default, and the Swift port leans on strong types — particularly in
+the spawn and scoring paths. Writing untyped GDScript would quietly discard
+the safety that port was relying on.
+
 ### Why not SwiftGodot, despite it being the only option that keeps the engine
 
 Android is the reason. SwiftGodot reaches Android through Swift's Android
