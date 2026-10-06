@@ -1,0 +1,40 @@
+; Engine configuration file.
+; Godot regenerates and reorders this on first open — that is expected.
+; The settings here are the ones chosen deliberately; see PLAN.md.
+
+config_version=5
+
+[application]
+
+config/name="Marmor"
+config/description="A King-vs-Pretender marble-lines puzzle."
+config/features=PackedStringArray("4.3", "Mobile")
+
+[display]
+
+; Portrait, phone-shaped. 720x1280 is a 9:16 reference resolution; the stretch
+; settings below fit it to whatever the device actually is.
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/handheld/orientation=1
+
+; canvas_items scales the 2D content rather than the window, and "expand"
+; gives the extra space to the viewport on mismatched aspect ratios instead of
+; letterboxing. Phones vary too much in aspect ratio for black bars to be
+; acceptable.
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+
+; "mobile", not "gl_compatibility": the design depends on glow/bloom (see
+; PLAN.md section 1 — real bloom is the reason for choosing an engine at all),
+; and the Compatibility renderer's glow support is limited. Not "forward_plus"
+; either, which is desktop-oriented and expensive on phone GPUs.
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+
+; Nearest-neighbour, project-wide. This is THE setting for pixel art — the
+; default is linear, which blurs every sprite into mush at any scale that
+; isn't 1:1. Easy to lose and hard to spot the cause of later.
+textures/canvas_textures/default_texture_filter=0

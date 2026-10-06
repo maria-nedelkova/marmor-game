@@ -6,3 +6,9 @@ DerivedData/
 xcuserdata/
 Packages/
 *.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Godot
+.godot/
+/android/
+export_presets.cfg
+*.translation
