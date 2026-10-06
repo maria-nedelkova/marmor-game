@@ -10,6 +10,10 @@ config/name="Marmor"
 config/description="A King-vs-Pretender marble-lines puzzle."
 config/features=PackedStringArray("4.7", "Mobile")
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
+
 [display]
 
 ; Portrait, phone-shaped. 720x1280 is a 9:16 reference resolution; the stretch

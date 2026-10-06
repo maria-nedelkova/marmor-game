@@ -12,3 +12,4 @@ Packages/
 /android/
 export_presets.cfg
 *.translation
+reports/
