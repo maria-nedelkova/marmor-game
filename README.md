@@ -5,9 +5,19 @@ puzzle in the spirit of the old DOS *Color Lines*.
 
 ## Status
 
+> **The direction has changed: this is becoming a Godot game, not a SwiftUI
+> one.** Read [PLAN.md](PLAN.md) first — it carries the decision and its
+> reasoning, the new escalating score system, the level map, and what all of
+> that means for the Swift code below. Whether this package survives at all
+> depends on a language choice that PLAN.md lays out but does not make.
+
 `MarmorEngine` (game logic) and `MarmorAudio` (sound) are ported from the web
 version's `src/game/engine.ts` and `src/audio/sound.ts`. The SwiftUI app target
-does not exist yet.
+does not exist and now never will in that form.
+
+The engine is one feature behind the web version — the six-tool system and its
+two board operations (`bombAt`, `shuffleBoardColors`). Everything else that
+landed on web since is presentation. PLAN.md section 6 has the detail.
 
 > **Not yet compiled.** This was written on a Mac with no working Swift
 > toolchain, so it has never been through a compiler. Expect to fix a few

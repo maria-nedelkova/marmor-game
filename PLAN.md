@@ -1,0 +1,292 @@
+# Plan: Godot, the level map, the new scoring, and a backend
+
+Written 2026-10-06, as a handoff to a machine that can actually build and ship
+this. Nothing here is implemented yet — this file is the decisions and the
+reasoning behind them, so the next session doesn't start by re-deriving them.
+
+Source of truth for game logic is still the web repo (`../marmor`) at commit
+`cf8305a`. Read that before writing new logic; it is ahead of this repo (see
+*Where the port actually stands*).
+
+---
+
+## 1. The decision: Godot
+
+Mobile is the focus from here. **The new scoring system and the level map are
+not being built on web** — the web version stays as it is, as a playable
+prototype and as the reference implementation of the game rules.
+
+Why Godot over the alternatives:
+
+The look matters a lot here, and the target design (see
+`docs/reference/level-map.jpeg`) is a pixel-art space map with heavy neon
+bloom, glowing nodes, and a starfield. That is a *renderer* problem, not a UI
+toolkit problem.
+
+- Every effect in that reference is **easier in a real renderer than in CSS**.
+  The web version's neon is layered `box-shadow` imitating bloom. Godot does
+  actual bloom as a post-process, which is why the reference looks the way it
+  does and the web version only approximates it.
+- Pixel art becomes a texture with nearest-neighbour filtering instead of a
+  CSS grid of `<div>`s (a 16x18 sprite is currently 288 DOM nodes).
+- Parallax starfields, shader-animated nebulae and particles are built in.
+
+Rejected, and why:
+
+- **SwiftUI / Jetpack Compose native** — would work, but means hand-rolling
+  effects an engine gives away. No benefit for a turn-based puzzle.
+- **React Native + Skia** — genuinely strong, and would have let the
+  TypeScript engine port across unchanged. Lost to Godot on game-feel tooling
+  and on bloom/particles being first-class rather than assembled.
+- **Capacitor wrapper around the web app** — cheapest path to the stores and
+  keeps the CSS, but it is the prototype shipped as the product, and it caps
+  how good this can look.
+
+The cost of this decision is the engine rewrite. That is the next section.
+
+---
+
+## 2. What happens to the Swift port
+
+`Sources/MarmorEngine` and `Sources/MarmorAudio` are a careful, well-tested
+port of the web engine. Godot does not run Swift natively, so there is a real
+decision here, and it should be made **on day one with a hello-world export to
+a device**, not after the game is built.
+
+Three options, honestly:
+
+| Option | Keeps the Swift port | Export path |
+| --- | --- | --- |
+| **GDScript** | No — third rewrite of the engine | Best supported, least friction |
+| **C# (.NET)** | No — but a C# port from Swift is mechanical | Supported, historically the rockiest; verify early |
+| **SwiftGodot** (GDExtension) | Yes — `MarmorEngine` used nearly as-is | Smallest ecosystem, least-trodden path |
+
+My recommendation: **try SwiftGodot first, time-boxed.** The engine plus its
+test suite is the most valuable thing in this repo, and SwiftGodot is the only
+option that keeps it. But prove the export to a real device before committing
+— if it fights back, fall to GDScript and treat `MarmorEngine` as an
+executable specification to port from rather than as code to run. It is good
+enough to serve as that.
+
+Do not pick based on this table alone. All three export stories have moved
+recently and this was written without being able to test any of them.
+
+> **Repo name.** `marmor-ios` becomes a misnomer the moment this is Godot —
+> it will build for Android too. Worth renaming to `marmor-game` or
+> `marmor-mobile` at some point; left alone for now because it moves the git
+> remote.
+
+---
+
+## 3. The scoring system (new — not in any implementation yet)
+
+### The King's target escalates per level
+
+Today `KING_SCORE` is a flat 100 and the ladder gets harder by making 100
+harder to earn. That changes: each level gets its own target.
+
+| # | World | King's target |
+| --- | --- | --- |
+| 01 | NEONIA-1 | 100 |
+| 02 | SULFUR-KOR | 300 |
+| 03 | CRYSTALLOS | 600 |
+| 04 | BLACK HOLE 04 | 1 000 |
+| 05 | CELESTIAL RING STATION | 1 600 |
+| 06 | TERRA-FORMER | 2 400 |
+| 07 | GAIA PRIME | 3 500 |
+| 08 | GALACTIC CORE | 5 000 |
+
+Line values scale with the same per-level multiplier (`target / 100`), so
+clearing a line in level 4 is worth 10x what it is in level 1. Current
+formula, from `engine.ts` / `Engine.swift`:
+
+```
+scoreForClear(n) = n*2 + max(0, n-5)*3     // a line of 5 = 10 points
+```
+
+becomes that, multiplied by the level's multiplier.
+
+### Read this before tuning the curve
+
+**If the target and the line value scale together, the level plays exactly the
+same.** Level 4 at a 1000 target with 10x line values is the same ten lines as
+level 1 at 100. The numbers get bigger; the difficulty does not move.
+
+That is deliberate, not an oversight. Difficulty continues to come from the
+dials already in `levels.ts` (colours, spawn count, preview count, block
+probability, colour affinity, spawn-on-clear). The escalating score is a
+**reward** change, and where it actually bites is the leaderboard: beating
+level 8 contributes 5 000 to your monthly total where level 1 contributes 100,
+so depth is worth fifty times the time. That is the pull forward.
+
+The curve above is a proposal, not a decision. It was chosen so level 8 is 50x
+level 1 — enough that depth beats grinding, not so much that levels 1–7 stop
+counting. Straight doubling would make level 8 worth 128x and reduce the board
+to "did you beat the last level".
+
+### Monthly leaderboard
+
+Scores accumulate across level completions and **nullify at the end of each
+month**, so every month has a fresh set of leaders.
+
+**Open question — how a replay counts.** Every unlocked level is replayable
+forever, which creates a loophole: if each completion adds to the monthly
+total, grinding level 1 is the fastest way to climb, and the board rewards
+repetition over depth.
+
+Recommended fix: the monthly total is the **sum of your best score on each
+level**. Replaying still matters — beating your own record raises the total —
+but repetition alone earns nothing. An alternative is sum-of-bests plus a
+one-off first-clear bonus per level, which pushes harder toward progressing.
+Not yet decided.
+
+---
+
+## 4. The level map
+
+The map is **the first screen the player sees**, replacing the straight-to-
+board launch.
+
+- Eight worlds, one per level, in the order above.
+- **Unlocked gradually**: beating level N unlocks N+1.
+- **Every unlocked level is replayable**, any number of times.
+- **Each level is a different king** — its own avatar, matched to its world.
+- **Tapping the game name returns to the map** from anywhere in a level.
+
+The design target is `docs/reference/level-map.jpeg`, and the brief is "this
+precise design and even better."
+
+### Fix these in the reference
+
+The reference image is sloppy in specific ways. It is correct about mood and
+layout, wrong about structure:
+
+- **Duplicate `07`** — three nodes carry it. There are eight levels, numbered
+  01–08 exactly once each.
+- **A `10` that does not exist** — twice. The ladder ends at 08.
+- **Connection lines are wrong** — they wander and cross. The path should
+  trace 01 → 08 in order, so the route reads as the progression it is.
+- **Unnamed nodes** — the gold torus under 01, the comet, the nebula. Either
+  name them as real levels or drop them to background scenery; they currently
+  read as levels you cannot reach.
+- `GALACTIC CORE` is the level 08 boss node and should look like a finale.
+
+### King avatars
+
+Eight distinct heads, one per world, in the existing hand-authored pixel style
+(`src/game/sprites/` in the web repo shows the approach: `row()` helpers plus
+a small named palette). Sketch from the reference:
+
+```
+01  NEONIA-1                plain crown, green
+02  SULFUR-KOR              flame crown, orange
+03  CRYSTALLOS              shard crown, violet
+04  BLACK HOLE 04           faceless, event horizon
+05  CELESTIAL RING STATION  visored helm, gold
+06  TERRA-FORMER            leaf crown, green
+07  GAIA PRIME              orbital halo, cyan
+08  GALACTIC CORE           dark silhouette
+```
+
+Still open whether these get drawn up front or whether the map ships with a
+placeholder king on every node and the avatars land as a focused second pass.
+
+### Keep the data portable
+
+Levels, names, kings, unlock rules and the score curve should be **plain data
+in one file**, the way `levels.ts` already is. That file is the thing that
+survives; the presentation layer around it is disposable and should be
+treated that way. This is the single lesson worth carrying over from the web
+version — its engine ported cleanly and its 2 000 lines of CSS port not at
+all.
+
+---
+
+## 5. Backend
+
+Needed for profiles and for the monthly leaderboard to mean anything across
+devices. Not started. Deliberately after the map and the scoring, since both
+can run against local storage first.
+
+What it has to do:
+
+- **User profiles** — identity that survives a reinstall and a new device.
+  The web version has only an anonymous local `playerId`.
+- **Score submission** — per level, per player, keeping the best.
+- **Monthly leaderboard** — ranked totals, reset at the month boundary.
+  Decide whether past months are archived (a "previous month's champion" is
+  cheap to keep and gives the reset some weight) or discarded.
+- **Anti-cheat, at least token** — scores arriving from a client that can be
+  modified. Server-side sanity bounds at minimum: a score above what the
+  level's target and multiplier permit is not possible honestly.
+
+Nothing is chosen for the stack yet. The requirements are small enough that
+almost anything serves.
+
+---
+
+## 6. Where the port actually stands
+
+Better than expected. The Swift engine was last caught up on 2026-09-14, and
+**the only game-logic change on web since then is the tool system**:
+
+```
+d9a7d08  Add the tools model and their board operations
+2cefce0  Wire up the tools: charges, board actions and the rack
+6f57560  Give the tools pixel-art icons and a phone-width rack
+9bc9e76  Put the tools above the board and the top bar below it
+a1280a9  Move the mobile controls up between the mascots, tools below the board
+bd59b49  Size the mobile queue preview for four marbles, not three
+7dad245  Add the pouch and the bomb, and make foresight predict places
+52334ae  Announce the new tool on the round-cleared screen
+1913581  Persist the crystal ball's forecast across a tab eviction
+```
+
+Everything after 2026-10-01 is CSS, a theme system, and then the removal of
+that theme system. None of it touches game rules.
+
+So the logic gap is:
+
+- **`src/game/tools.ts` (132 lines)** — six tools on an unlock ladder, with a
+  charge economy. Hammer, flask (swap two), dice (reroll the queue), pouch
+  (shuffle the board's colours), bomb (clear a 3x3), crystal ball (commit and
+  reveal the next spawn's *places*).
+- **Two engine operations** — `bombAt(board, cell)` and
+  `shuffleBoardColors(board)`. Both exist in `engine.ts`, neither in
+  `Engine.swift`.
+- **`progress.ts`** — deliberately not ported; see the README's reasoning,
+  which still holds. Its `foreseen` field (the crystal ball's committed
+  forecast) is newer than that note.
+
+Also still true from the README: **none of this Swift has ever been
+compiled.** It was written on a machine with no working toolchain. Expect to
+fix things on the first `swift test`, and do that before judging whether
+SwiftGodot is viable — a failing build there is not evidence about Godot.
+
+---
+
+## 7. Suggested order
+
+1. Hello-world Godot export to a real device, in whichever language you mean
+   to use. Settle section 2 before anything else is built on top of it.
+2. `swift test` if SwiftGodot is still in play — find out what the uncompiled
+   port actually costs.
+3. Level/world data as one plain-data file: names, kings, targets,
+   multipliers, unlock rules.
+4. The level map screen, against local storage.
+5. The board, driven by the ported engine.
+6. The tool system (port `tools.ts` while doing it).
+7. Backend, profiles, the real monthly leaderboard.
+
+---
+
+## Open questions
+
+- Which language, and does SwiftGodot survive a device export?
+- Replays: sum-of-bests, or sum-of-bests plus a first-clear bonus?
+- Exact score curve — the table in section 3 is a proposal.
+- King avatars up front, or a placeholder pass first?
+- Are past months archived, or discarded at reset?
+- Do the tools carry over to mobile unchanged? They were designed around a
+  phone-width rack, so probably, but their charge economy was tuned against a
+  flat 100-point target and now the target moves.
