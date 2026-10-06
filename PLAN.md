@@ -96,8 +96,8 @@ Three things that get wrongly attributed to this choice, and one that doesn't:
   turn-based. It could be written in almost anything.
 - **Testing is the real trade.** `swift test` and XCTest are excellent;
   GDScript means a community addon — GUT or GdUnit4. Both work, both are
-  less polished. Pick one on day one, because the plan below depends on
-  porting the test suite *first*.
+  less polished. See *Test framework* below; pick on day one, because the
+  plan depends on porting the test suite *first*.
 
 One thing to do deliberately: **use GDScript's static typing everywhere**
 (`var n: int`, typed parameters and returns). It is optional in Godot 4 and
@@ -134,6 +134,37 @@ make them pass.
 
 Do not pick on this table alone. All three export stories move, and this was
 written without being able to test any of them.
+
+### Test framework: GdUnit4
+
+A close call, and a **reversible one** — the tests are plain assertions over
+pure functions, so switching later is largely find-and-replace on assertion
+syntax. Not worth agonising over.
+
+**GdUnit4**, because:
+
+- It is built for Godot 4; GUT carries history from the Godot 2/3 era.
+- It supports GDScript **and** C#, which hedges the language decision in
+  section 2 — if the GDScript rewrite goes badly, the tests survive the
+  move to C#.
+- Editor-integrated test inspector plus a VS Code extension. Worth something
+  while learning the engine and porting at the same time.
+- Fluent assertions (`assert_that(x).is_equal(y)`) read closer to what the
+  XCTest suite already expresses than GUT's plainer `assert_eq`.
+
+**GUT's case is genuine**: simpler, lighter, longer track record, and far
+more tutorials and community answers written against it. If the tests stay
+mostly straight equality checks, it is entirely adequate.
+
+One argument deliberately *not* made for GdUnit4: its data-generator and
+fuzzing support. `FuzzTests.swift` does not need it — the Swift port rolls a
+seeded SplitMix64 so the 10k-move fuzz runs are reproducible, and that is
+framework-agnostic. The PRNG gets ported to GDScript either way.
+
+> Both are community addons and both move. Check each one's recent activity
+> and its compatibility with the exact Godot version you install before
+> committing. That is a two-minute look at their repos, and it beats this
+> file — written at a remove, and without being able to run either.
 
 > **Repo name.** `marmor-ios` becomes a misnomer the moment this is Godot —
 > it will build for Android too. Worth renaming to `marmor-game` or
@@ -336,7 +367,8 @@ SwiftGodot is viable — a failing build there is not evidence about Godot.
    anything is built on top of it. Doing both now is the point — the whole
    case for Godot is that one codebase ships to two stores, and that claim
    should be tested while it is cheap to act on.
-2. Port the engine tests first, then make them pass. The Swift suite in
+2. Install GdUnit4 (see section 2) and port the engine tests first, then
+   make them pass. The Swift suite in
    `Tests/MarmorEngineTests/` is the specification; translating the
    assertions before the implementation is what keeps the subtle behaviour
    (blocking tie-breaks, colour affinity, the ladder guardrails) from
