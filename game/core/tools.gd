@@ -26,10 +26,10 @@
 ##    improved. Those worlds have names now (SULFUR-KOR, CRYSTALLOS...), so
 ##    this copy should probably be rewritten to use them. That is a writing
 ##    decision, not a porting one.
-## 2. **The charge economy was tuned against a flat 100-point target**, which
-##    now escalates per world (PLAN.md section 3). Whether one hammer still
-##    means the same thing in GALACTIC CORE as in NEONIA-1 is an open
-##    question — it is listed in PLAN.md and is not answered by this file.
+## 2. **Charges do not scale with the world's target.** Decided 2026-10-06: a
+##    hammer means the same thing in GALACTIC CORE as in NEONIA-1. The score
+##    escalates, the tools do not. So nothing in this file reads the world's
+##    target or multiplier, and that is deliberate rather than unfinished.
 class_name Tools
 
 const HAMMER := "hammer"

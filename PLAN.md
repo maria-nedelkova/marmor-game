@@ -256,6 +256,17 @@ level 1 — enough that depth beats grinding, not so much that levels 1–7 stop
 counting. Straight doubling would make level 8 worth 128x and reduce the board
 to "did you beat the last level".
 
+### Tools do not scale with the target
+
+**Decided 2026-10-06: a hammer means the same thing in GALACTIC CORE as in
+NEONIA-1.** The score escalates; the toolkit does not.
+
+This keeps the two systems independent, which is worth more than the
+symmetry would have been. Tool charges stay a progression reward — one more
+thing you can do each world — rather than a second currency that has to be
+rebalanced every time a target moves. `game/core/tools.gd` reads neither
+`target` nor `multiplier`, and says so in place.
+
 ### Monthly leaderboard
 
 Scores accumulate across level completions and **nullify at the end of each
@@ -428,5 +439,5 @@ SwiftGodot is viable — a failing build there is not evidence about Godot.
 - King avatars up front, or a placeholder pass first?
 - Are past months archived, or discarded at reset?
 - Do the tools carry over to mobile unchanged? They were designed around a
-  phone-width rack, so probably, but their charge economy was tuned against a
-  flat 100-point target and now the target moves.
+  phone-width rack, so probably — but the rack is a layout question now that
+  the charge economy is settled.

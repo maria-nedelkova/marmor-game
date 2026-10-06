@@ -8,6 +8,7 @@ config_version=5
 
 config/name="Marmor"
 config/description="A King-vs-Pretender marble-lines puzzle."
+run/main_scene="res://game/ui/level_map.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 
 [editor_plugins]
