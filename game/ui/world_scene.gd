@@ -132,6 +132,7 @@ func _refresh() -> void:
 	_queue_label.text = "next up:  %s" % ", ".join(names)
 
 	_prompt_label.text = session.prompt()
+	queue_redraw()
 	_rebuild_tools()
 	if _board_view != null:
 		_board_view.queue_redraw()
@@ -215,3 +216,18 @@ func _on_finished(won: bool) -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.027, 0.08))
+	if session == null:
+		return
+
+	# The king you are actually fighting, beside the score he set. "Each world
+	# is a new king" is the premise, and it only lands if he is on screen while
+	# you play rather than only on the map you picked him from.
+	var texture := Kings.texture_for(session.world["id"])
+	if texture == null:
+		return
+	var box := Rect2(Vector2(size.x * 0.5 + 118.0, 38.0), Vector2(48.0, 48.0))
+	var tint := Color.WHITE
+	if session.phase == GameSession.Phase.WON:
+		# Dethroned: drained of colour, so the header reflects the outcome.
+		tint = Color(0.45, 0.45, 0.52, 0.8)
+	PixelSprite.draw_scaled(self, texture, box, tint)

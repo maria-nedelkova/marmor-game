@@ -55,6 +55,14 @@ const PLANET_COLORS: Array[Color] = [
 ]
 
 const NODE_RADIUS := 42.0
+## The king hangs off the planet's upper right, the way the reference sets its
+## avatars beside each world rather than on top of them.
+##
+## 48 is deliberate rather than tasteful: the sprites are 12px, and
+## PixelSprite.draw_scaled only ever uses whole-number scales, so 48 is exactly
+## 4x. At 36 it was 3x and the crowns were legible but cramped; anything
+## between would round down and waste the space without adding a pixel.
+const KING_SIZE := 48.0
 ## Gap between a planet and its first label row. Used by BOTH the layout and
 ## the label-zone helper, which must agree — when they were two literals, the
 ## final world's ring (NODE_RADIUS + 12) ended up drawn across its own name.
@@ -270,6 +278,7 @@ func _draw() -> void:
 
 	for i in Worlds.COUNT:
 		_draw_planet(i)
+		_draw_king(i)
 
 
 ## Dots rather than a solid stroke — the reference uses them, and they keep the
@@ -295,6 +304,23 @@ func _draw_dotted(from: Vector2, to: Vector2, tint: Color, reached: bool) -> voi
 		if _is_on_a_label(at):
 			continue
 		draw_circle(at, 2.6 if reached else 2.0, tint)
+
+
+## The world's king, hung off the planet's upper right.
+##
+## Drawn after the planet so it sits on top, and desaturated rather than
+## hidden when the world is locked — seeing WHO you have still to face is
+## most of what makes a map worth looking at.
+func _draw_king(index: int) -> void:
+	var world := Worlds.get_world(index)
+	var texture := Kings.texture_for(world["id"])
+	if texture == null:
+		return
+	var centre := _node_center(index)
+	var at := centre + Vector2(NODE_RADIUS * 0.55, -NODE_RADIUS * 0.95)
+	var box := Rect2(at, Vector2(KING_SIZE, KING_SIZE))
+	var tint := Color.WHITE if progress.is_unlocked(index) else Color(0.5, 0.5, 0.58, 0.85)
+	PixelSprite.draw_scaled(self, texture, box, tint)
 
 
 func _draw_planet(index: int) -> void:
