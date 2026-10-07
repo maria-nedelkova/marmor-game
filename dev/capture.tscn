@@ -1,6 +1,10 @@
-[gd_scene load_steps=2 format=3 uid="uid://bmarmorcapture01"]
+[gd_scene load_steps=3 format=3 uid="uid://bmarmorcapture01"]
 
 [ext_resource type="Script" path="res://dev/capture.gd" id="1_cap"]
+[ext_resource type="Environment" path="res://game/ui/space_environment.tres" id="2_env"]
 
 [node name="Capture" type="Node"]
 script = ExtResource("1_cap")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("2_env")

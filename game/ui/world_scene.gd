@@ -54,7 +54,7 @@ func _build() -> void:
 	_title.text = "MARMOR"
 	_title.flat = true
 	_title.focus_mode = Control.FOCUS_NONE
-	_title.add_theme_color_override("font_color", Color(1.0, 0.78, 0.95))
+	_title.add_theme_color_override("font_color", Color(1.85, 1.12, 1.7))
 	_title.add_theme_font_size_override("font_size", 26)
 	_title.tooltip_text = "Back to the map"
 	_title.pressed.connect(func() -> void:
@@ -63,12 +63,12 @@ func _build() -> void:
 		exit_requested.emit())
 	add_child(_title)
 
-	_score_label = _make_label(Color(0.92, 0.95, 1.0), 18)
-	_queue_label = _make_label(Color(0.62, 0.72, 0.92), 14)
-	_status_label = _make_label(Color(1.0, 0.85, 0.55), 20)
+	_score_label = _make_label(Color(1.3, 1.36, 1.5), 18)
+	_queue_label = _make_label(Color(0.88, 1.0, 1.25), 14)
+	_status_label = _make_label(Color(1.9, 1.5, 0.85), 20)
 	# Reserved whether or not a tool is armed, so arming one does not shove the
 	# board up a line.
-	_prompt_label = _make_label(Color(0.98, 0.72, 0.42), 14)
+	_prompt_label = _make_label(Color(1.45, 1.02, 0.58), 14)
 
 	_board_view = Control.new()
 	_board_view.set_script(BoardViewScript)
@@ -215,7 +215,7 @@ func _on_finished(won: bool) -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.027, 0.08))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.075, 0.058, 0.155))
 	if session == null:
 		return
 

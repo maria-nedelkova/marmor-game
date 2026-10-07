@@ -32,6 +32,12 @@ window/stretch/aspect="expand"
 
 [rendering]
 
+; Required for 2D glow. Without it the 2D framebuffer is LDR and every colour
+; is clamped at 1.0, so nothing can ever exceed the glow threshold and the
+; WorldEnvironment has no effect at all — the single easiest way to spend an
+; afternoon wondering why bloom does nothing.
+viewport/hdr_2d=true
+
 ; "mobile", not "gl_compatibility": the design depends on glow/bloom (see
 ; PLAN.md section 1 — real bloom is the reason for choosing an engine at all),
 ; and the Compatibility renderer's glow support is limited. Not "forward_plus"

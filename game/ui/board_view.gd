@@ -38,9 +38,25 @@ const MARBLE_COLORS: Array[Color] = [
 	Color(0.96, 0.44, 0.74),  # pink
 ]
 
-const GRID_LINE := Color(0.62, 0.38, 0.86, 0.55)
-const BOARD_BG := Color(0.07, 0.05, 0.14)
-const ARMED_TINT := Color(0.98, 0.72, 0.42)
+## Just over the glow threshold, so the grid reads as lit tubing rather than
+## as drawn lines. See level_map.gd's HDR_GAIN note on why these sit barely
+## above 1.0 instead of well above it.
+const GRID_LINE := Color(1.05, 0.62, 1.35, 0.6)
+const BOARD_BG := Color(0.10, 0.07, 0.19)
+## Multiplier for a marble's specular highlight. The highlight is the only part
+## of a marble that blooms — pushing the whole disc over the threshold turns 81
+## marbles into 81 lamps and the board washes out.
+##
+## Low, for the same reason as the map's HDR_GAIN: at 1.55 every highlight
+## clipped to flat white, so a red marble and a blue one had identical white
+## dots on them.
+const HIGHLIGHT_GAIN := 1.18
+const ARMED_TINT := Color(1.45, 1.02, 0.58)
+## The full-board armed wash, deliberately BELOW the glow threshold while
+## ARMED_TINT above it is above. A wash is meant to be noticed and not looked
+## at; at HDR values the bloom spread it across the whole grid and turned a
+## violet board warm orange.
+const ARMED_WASH := Color(0.62, 0.44, 0.26)
 
 ## Seconds per cell travelled. Short, because a marble crossing the board can
 ## cover sixteen cells and a per-cell cost that feels right over three becomes
@@ -227,7 +243,7 @@ func _draw() -> void:
 
 	# Selection ring under the marble, so the marble stays fully legible.
 	if session.has_selection() and not is_busy():
-		draw_circle(cell_center(session.selected), s * 0.46, Color(1.0, 1.0, 1.0, 0.18))
+		draw_circle(cell_center(session.selected), s * 0.46, Color(1.6, 1.6, 1.7, 0.22))
 
 	# The flask's first pick, in the prompt's colour so the board and the line
 	# of text asking for a second marble read as one instruction.
@@ -279,7 +295,7 @@ func _draw() -> void:
 	# hammer without noticing. A rack button alone is too easy to lose track of
 	# when the board is where you are looking.
 	if session.is_armed():
-		draw_rect(Rect2(origin, Vector2(side, side)), Color(ARMED_TINT.r, ARMED_TINT.g, ARMED_TINT.b, 0.06))
+		draw_rect(Rect2(origin, Vector2(side, side)), Color(ARMED_WASH.r, ARMED_WASH.g, ARMED_WASH.b, 0.05))
 
 
 ## Walks the path at constant speed, so a marble turning a corner does not
@@ -297,4 +313,9 @@ func _draw_marble(centre: Vector2, radius: float, color_index: int) -> void:
 	var base: Color = MARBLE_COLORS[color_index % MARBLE_COLORS.size()]
 	draw_circle(centre, radius, base.darkened(0.45))
 	draw_circle(centre, radius * 0.88, base)
-	draw_circle(centre - Vector2(radius * 0.3, radius * 0.3), radius * 0.34, base.lightened(0.45))
+	var lit := base.lightened(0.45)
+	draw_circle(
+		centre - Vector2(radius * 0.3, radius * 0.3),
+		radius * 0.34,
+		Color(lit.r * HIGHLIGHT_GAIN, lit.g * HIGHLIGHT_GAIN, lit.b * HIGHLIGHT_GAIN, lit.a),
+	)

@@ -68,6 +68,15 @@ const KING_SIZE := 48.0
 ## final world's ring (NODE_RADIUS + 12) ended up drawn across its own name.
 const LABEL_TOP_GAP := 18.0
 const LOCKED_TINT := Color(0.32, 0.34, 0.44)
+## How far past the glow threshold (1.0) a lit element is pushed. Everything
+## that should bloom is multiplied by this; everything that should not is left
+## under 1.0.
+##
+## Kept low. At 1.7 a bright planet clipped to flat white and lost its own
+## colour entirely — the glow around it was green while the disc itself was a
+## white hole. Just over the threshold is enough to bloom while still reading
+## as the colour it is.
+const HDR_GAIN := 1.22
 
 var progress: PlayerProgress
 var _nodes: Array[Control] = []
@@ -119,7 +128,7 @@ func _build_header() -> void:
 	title.name = "Title"
 	title.text = "MARMOR"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_color_override("font_color", Color(1.0, 0.78, 0.95))
+	title.add_theme_color_override("font_color", Color(1.9, 1.15, 1.75))
 	title.add_theme_font_size_override("font_size", 34)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(title)
@@ -129,7 +138,7 @@ func _build_header() -> void:
 	total.name = "MonthlyTotal"
 	total.text = "THIS MONTH   %d" % progress.monthly_total()
 	total.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	total.add_theme_color_override("font_color", Color(0.60, 0.88, 0.98))
+	total.add_theme_color_override("font_color", Color(0.92, 1.35, 1.5))
 	total.add_theme_font_size_override("font_size", 14)
 	total.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(total)
@@ -162,7 +171,7 @@ func _build_nodes() -> void:
 		var label := Label.new()
 		label.text = "%02d  %s" % [i + 1, world["name"]]
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.add_theme_color_override("font_color", Color(0.92, 0.95, 1.0) if unlocked else LOCKED_TINT)
+		label.add_theme_color_override("font_color", Color(1.35, 1.4, 1.5) if unlocked else Color(0.68, 0.70, 0.82))
 		label.add_theme_font_size_override("font_size", 15)
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		button.add_child(label)
@@ -176,7 +185,7 @@ func _build_nodes() -> void:
 		else:
 			sub.text = "target %d" % world["target"]
 		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sub.add_theme_color_override("font_color", Color(0.62, 0.68, 0.85))
+		sub.add_theme_color_override("font_color", Color(0.86, 0.94, 1.15))
 		sub.add_theme_font_size_override("font_size", 12)
 		sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		button.add_child(sub)
@@ -252,7 +261,7 @@ func _is_on_a_label(point: Vector2) -> bool:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.035, 0.027, 0.08))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.075, 0.058, 0.155))
 
 	_label_zones.clear()
 	for i in Worlds.COUNT:
@@ -265,7 +274,7 @@ func _draw() -> void:
 		var pos: Vector2 = (star["pos"] as Vector2) * size
 		if _is_on_a_label(pos):
 			continue
-		draw_circle(pos, star["radius"], Color(0.85, 0.90, 1.0, star["alpha"]))
+		draw_circle(pos, star["radius"], Color(1.15, 1.22, 1.35, star["alpha"]))
 
 	# The route, strictly between consecutive worlds. A segment is lit only if
 	# its destination is unlocked, so the line doubles as the progress bar.
@@ -273,7 +282,7 @@ func _draw() -> void:
 		var from := _node_center(i)
 		var to := _node_center(i + 1)
 		var reached := progress.is_unlocked(i + 1)
-		var tint := Color(0.98, 0.45, 0.80, 0.75) if reached else Color(0.45, 0.45, 0.60, 0.30)
+		var tint := Color(1.5, 0.70, 1.25, 0.9) if reached else Color(0.72, 0.72, 0.92, 0.55)
 		_draw_dotted(from, to, tint, reached)
 
 	for i in Worlds.COUNT:
@@ -328,22 +337,31 @@ func _draw_planet(index: int) -> void:
 	var unlocked: bool = progress.is_unlocked(index)
 	var base: Color = PLANET_COLORS[index]
 	if not unlocked:
-		base = base.lerp(LOCKED_TINT, 0.72)
-
-	# Halo first, as a few widening translucent discs. Cheap stand-in for real
-	# bloom — the project is on the Mobile renderer so a WorldEnvironment glow
-	# can replace this once the art is in.
-	if unlocked:
-		for ring in 3:
-			var r := NODE_RADIUS + 6.0 + ring * 7.0
-			draw_circle(centre, r, Color(base.r, base.g, base.b, 0.09 - ring * 0.025))
+		base = base.lerp(LOCKED_TINT, 0.45)
 
 	draw_circle(centre, NODE_RADIUS, base.darkened(0.45))
 	draw_circle(centre, NODE_RADIUS - 3.0, base)
+
+	# Above 1.0 on purpose: this is what the WorldEnvironment's glow picks up,
+	# and it replaces the three stacked translucent discs that used to fake a
+	# halo here. Real bloom spreads from the bright pixels themselves, so the
+	# halo follows the planet's own colour and the terminator between lit and
+	# unlit edge instead of being a uniform ring painted around it.
+	#
+	# Locked worlds stay BELOW the threshold, which is why they read as dim
+	# without needing a separate dimming pass — they simply never bloom.
+	if unlocked:
+		var hot := Color(base.r * HDR_GAIN, base.g * HDR_GAIN, base.b * HDR_GAIN)
+		draw_circle(centre, NODE_RADIUS - 6.0, hot)
+
 	# Offset highlight, so the disc reads as a sphere rather than a dot.
-	draw_circle(centre + Vector2(-NODE_RADIUS * 0.28, -NODE_RADIUS * 0.28), NODE_RADIUS * 0.42, base.lightened(0.35))
+	var lit := base.lightened(0.35)
+	if unlocked:
+		lit = Color(lit.r * HDR_GAIN, lit.g * HDR_GAIN, lit.b * HDR_GAIN)
+	draw_circle(centre + Vector2(-NODE_RADIUS * 0.28, -NODE_RADIUS * 0.28), NODE_RADIUS * 0.42, lit)
 
 	# The final world gets a ring, so GALACTIC CORE reads as a destination
 	# rather than as the eighth of eight.
 	if index == Worlds.COUNT - 1:
-		draw_arc(centre, NODE_RADIUS + 12.0, 0.0, TAU, 48, Color(0.98, 0.35, 0.72, 0.9 if unlocked else 0.3), 2.5)
+		var ring := Color(1.7, 0.55, 1.25, 0.95) if unlocked else Color(0.45, 0.18, 0.34, 0.5)
+		draw_arc(centre, NODE_RADIUS + 12.0, 0.0, TAU, 48, ring, 2.5)

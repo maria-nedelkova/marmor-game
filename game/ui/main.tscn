@@ -1,6 +1,10 @@
-[gd_scene load_steps=2 format=3 uid="uid://bmarmormain0001"]
+[gd_scene load_steps=3 format=3 uid="uid://bmarmormain0001"]
 
 [ext_resource type="Script" path="res://game/ui/main.gd" id="1_main"]
+[ext_resource type="Environment" path="res://game/ui/space_environment.tres" id="2_env"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("2_env")
