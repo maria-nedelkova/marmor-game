@@ -28,42 +28,49 @@
 class_name Kings
 
 
-## 01 NEONIA-1 — the reference's chibi king: a three-point gold crown with a
-## red gem, a wide pale face, heavy slanted eyes and blushed cheeks.
+## 01 NEONIA-1 — the reference's chibi king. The eyes are the detail that
+## carries him: two thick dark bars stepping DOWN toward the centre, which is
+## what reads as a face rather than as two dots. Red gem in the crown band,
+## blushed cheeks, small mouth.
 const NEONIA := [
 	"..c..cc..c..",
 	".cc.cccc.cc.",
-	".ccccggcccc.",
+	".cccgggcccc.",
 	".cccccccccc.",
-	".kkkkkkkkkk.",
 	".kllllllllk.",
+	".kllllllllk.",
+	".keelllleek.",
 	".kleelleelk.",
 	".kllllllllk.",
 	".kalleellak.",
 	".kllllllllk.",
 	".kkkkkkkkkk.",
-	"....dddd....",
 ]
 
-## 02 SULFUR-KOR — hair of fire. The flames are asymmetric on purpose: fire
-## that mirrors itself reads as a pattern rather than as burning.
+## 02 SULFUR-KOR — hair of fire over a lit gold face.
+##
+## The balance of lit to dark rows is what decides whether this reads as a face
+## or as a dark box with marks on it. An earlier version spent five of its seven
+## face rows on brow, eyes, mouth and teeth, and the gold never showed. Two
+## clear lit rows carry it, and the teeth are gone — at 12px they were noise.
 const SULFUR := [
 	"..h..hh..h..",
-	".hch.hch.hc.",
-	".cchcchccchc",
+	".hhc.hch.hh.",
+	".chchhchchc.",
 	".cccccccccc.",
 	".kkkkkkkkkk.",
+	".kmmmmmmmmk.",
 	".kbbmmmmbbk.",
 	".kmeemmeemk.",
 	".kmmmmmmmmk.",
-	".kmmeeeemmk.",
-	".kmmmmmmmmk.",
+	".kmeeeeeemk.",
 	".kkkkkkkkkk.",
 	"....dddd....",
 ]
 
-## 03 CRYSTALLOS — a bronze king under a gold crown set with green gems, with
-## the heavy brow and square frown the reference gives him.
+## 03 CRYSTALLOS — a bronze king under a gold crown set with green gems.
+## One brow row, not two: stacked, the dark took up a third of the face and
+## buried it. A lit row above the brow is what gives the head its volume.
 const CRYSTALLOS := [
 	"..c..cc..c..",
 	".cgc.cgc.cgc",
@@ -98,8 +105,8 @@ const BLACK_HOLE := [
 ]
 
 ## 05 CELESTIAL RING STATION — a white machine helm under a gold crown with a
-## violet gem, its eyes a pair of lit gold bars above a dark visor slit. The
-## one king whose face you never see.
+## violet gem: lit gold eye bars, a panel seam, and a dark visor slit below.
+## The one king whose face you never see.
 const RING_STATION := [
 	"..c..cc..c..",
 	".ccc.cc.ccc.",
@@ -107,26 +114,27 @@ const RING_STATION := [
 	".cccccccccc.",
 	".kkkkkkkkkk.",
 	".kllllllllk.",
-	".kceecceeck.",
-	".kllllllllk.",
-	".kmeeeeeemk.",
+	".kcceccecck.",
+	".kmmmmmmmmk.",
+	".kleeeeeelk.",
 	".kllllllllk.",
 	".kkkkkkkkkk.",
 	"....dddd....",
 ]
 
-## 06 TERRA-FORMER — a bark-brown face wreathed in leaves, with a beard. The
-## foliage spreads outward rather than up: growth, not authority.
+## 06 TERRA-FORMER — a bark-brown face wreathed in leaves, with pale eyes and
+## a beard. The foliage breaks the silhouette at both sides rather than sitting
+## on top: growth, not a hat.
 const TERRA_FORMER := [
 	".cc.cccc.cc.",
-	".cccccccccc.",
+	"ccccccccccc.",
 	"c.cccccccc.c",
 	".ckkkkkkkkc.",
-	".kmmmmmmmmk.",
+	"ckmmmmmmmmkc",
 	".kcmmmmmmck.",
-	".kmeemmeemk.",
+	".kmwwmmwwmk.",
 	".kmmmmmmmmk.",
-	".kbbmmmmbbk.",
+	"ckbbmmmmbbkc",
 	".kbbeeeebbk.",
 	".kkbbbbbbkk.",
 	"....kkkk....",
@@ -149,22 +157,26 @@ const GAIA_PRIME := [
 	"....dddd....",
 ]
 
-## 08 GALACTIC CORE — the reference's hooded figure: a dark cowl ringed with
-## stars and two burning eyes, and no face at all behind it. The finale should
-## not look like another man in a hat.
+## 08 GALACTIC CORE — the reference frames him, so this does too: a hooded void
+## inside a plaque, ringed by stars, with two burning eyes and no face.
+##
+## The hood is drawn a step LIGHTER than the plaque's interior. Drawn in the
+## same near-black it vanished — a dark shape on a dark ground is not a
+## silhouette, it is nothing. The interior has to be darker than the thing
+## standing in it.
 const GALACTIC_CORE := [
-	"..aa.aa.aa..",
-	".a.cccccc.a.",
-	"a.cccccccc.a",
-	".cckkkkkkcc.",
-	".ckkkkkkkkc.",
-	".ckwwkkwwkc.",
-	".ckkkkkkkkc.",
-	"a.kkkkkkkk.a",
-	".a.kkkkkk.a.",
-	"..a.kkkk.a..",
-	"...aaaaaa...",
-	"....aaaa....",
+	"cccccccccccc",
+	"cddddddddddc",
+	"cda.mmmm.adc",
+	"cd.mmmmmm.dc",
+	"cdammmmmmadc",
+	"cdmwwmmwwmdc",
+	"cdammmmmmadc",
+	"cd.mmmmmm.dc",
+	"cda.mmmm.adc",
+	"cdd.mmmm.ddc",
+	"cddddddddddc",
+	"cccccccccccc",
 ]
 
 
@@ -179,13 +191,13 @@ const PALETTES := {
 	},
 	"sulfur_kor": {
 		"k": Color(0.18, 0.07, 0.05), "c": Color(0.93, 0.33, 0.10), "h": Color(1.0, 0.82, 0.26),
-		"g": Color(1.0, 0.92, 0.45), "l": Color(0.92, 0.74, 0.44), "m": Color(0.82, 0.63, 0.33),
+		"g": Color(1.0, 0.92, 0.45), "l": Color(0.92, 0.74, 0.44), "m": Color(0.93, 0.72, 0.36),
 		"d": Color(0.50, 0.33, 0.14), "e": Color(0.16, 0.07, 0.05), "w": Color(1.0, 0.96, 0.80),
 		"b": Color(0.36, 0.16, 0.07), "a": Color(0.98, 0.56, 0.18),
 	},
 	"crystallos": {
 		"k": Color(0.16, 0.10, 0.14), "c": Color(0.93, 0.72, 0.22), "h": Color(0.74, 0.55, 0.20),
-		"g": Color(0.22, 0.78, 0.66), "l": Color(0.78, 0.63, 0.47), "m": Color(0.64, 0.50, 0.37),
+		"g": Color(0.22, 0.78, 0.66), "l": Color(0.78, 0.63, 0.47), "m": Color(0.78, 0.62, 0.45),
 		"d": Color(0.38, 0.28, 0.20), "e": Color(0.14, 0.09, 0.08), "w": Color(1.0, 1.0, 1.0),
 		"b": Color(0.26, 0.17, 0.12), "a": Color(0.72, 0.48, 0.98),
 	},
@@ -213,11 +225,11 @@ const PALETTES := {
 		"d": Color(0.13, 0.32, 0.42), "e": Color(0.08, 0.16, 0.20), "w": Color(1.0, 1.0, 1.0),
 		"b": Color(0.30, 0.60, 0.40), "a": Color(0.45, 0.92, 0.70),
 	},
-	"galactic_core": {
-		"k": Color(0.07, 0.05, 0.13), "c": Color(0.26, 0.16, 0.38), "h": Color(0.44, 0.28, 0.58),
-		"g": Color(0.60, 0.40, 0.85), "l": Color(0.20, 0.12, 0.28), "m": Color(0.14, 0.08, 0.20),
-		"d": Color(0.09, 0.05, 0.14), "e": Color(0.90, 0.95, 1.0), "w": Color(1.0, 1.0, 1.0),
-		"b": Color(0.18, 0.10, 0.24), "a": Color(0.62, 0.66, 1.0),
+		"galactic_core": {
+		"k": Color(0.07, 0.05, 0.13), "c": Color(0.36, 0.23, 0.54), "h": Color(0.52, 0.34, 0.70),
+		"g": Color(0.60, 0.40, 0.85), "l": Color(0.26, 0.18, 0.40), "m": Color(0.21, 0.14, 0.35),
+		"d": Color(0.055, 0.045, 0.125), "e": Color(0.90, 0.95, 1.0), "w": Color(1.0, 1.0, 1.0),
+		"b": Color(0.16, 0.10, 0.26), "a": Color(0.64, 0.72, 1.0),
 	},
 }
 
