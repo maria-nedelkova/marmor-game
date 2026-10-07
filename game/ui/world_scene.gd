@@ -12,6 +12,7 @@ const BoardViewScript := preload("res://game/ui/board_view.gd")
 const DuelHeaderScript := preload("res://game/ui/duel_header.gd")
 const ControlPanelScript := preload("res://game/ui/control_panel.gd")
 const PlaqueScript := preload("res://game/ui/plaque.gd")
+const SoundBankScript := preload("res://game/audio/sound_bank.gd")
 
 ## Wide enough for the longest short name at scale 2 — CRYSTAL is seven
 ## characters — plus padding. Six of these have to fit the board's width.
@@ -34,6 +35,7 @@ var _prompt := ""
 var _status_label: Label
 var _tool_bar: Control
 var _stars: Array[Dictionary] = []
+var _sound: Node
 
 
 func _ready() -> void:
@@ -90,6 +92,11 @@ func _build() -> void:
 	_board_view.stars = _stars
 	_board_view.cell_tapped.connect(_on_cell_tapped)
 	_board_view.animation_finished.connect(_refresh)
+	# Sound is driven by the VIEW rather than the session. The session resolves a
+	# whole turn in one call, so playing from its signals would fire the move,
+	# the clear and the spawn in the same instant — the board would be silent
+	# while it animated and then make every noise at once.
+	_board_view.event_started.connect(_on_view_event)
 	add_child(_board_view)
 
 	# A plain Control, not an HBoxContainer. The keys are drawn by _draw from
@@ -106,7 +113,12 @@ func _build() -> void:
 	_panel = Control.new()
 	_panel.set_script(ControlPanelScript)
 	_panel.restart_pressed.connect(_on_restart)
+	_panel.sound_toggled.connect(func(is_muted: bool) -> void: _sound.muted = is_muted)
 	add_child(_panel)
+
+	_sound = Node.new()
+	_sound.set_script(SoundBankScript)
+	add_child(_sound)
 
 	resized.connect(_layout)
 	_layout()
@@ -301,6 +313,7 @@ func _rebuild_tools() -> void:
 ## Pressing the armed tool again cancels it, which is the only way to back out
 ## without spending the charge — a stray board tap deliberately does not.
 func _on_tool_pressed(tool_id: String) -> void:
+	_sound.play(Sfx.CLICK)
 	if GameSession.is_targeted(tool_id):
 		if session.armed_tool == tool_id:
 			session.disarm()
@@ -338,8 +351,25 @@ func _on_spawned(cells: Array[Vector2i], colors: Array[int]) -> void:
 func _on_cell_tapped(cell: Vector2i) -> void:
 	if _board_view.is_busy():
 		return
-	if session.tap(cell) != "none":
-		_refresh()
+	var result := session.tap(cell)
+	if result == "none":
+		return
+	if result == "select" or result == "arm_second":
+		_sound.play(Sfx.SELECT)
+	elif result == "tool":
+		_sound.play(Sfx.PLACE)
+	_refresh()
+
+
+## One sound per animation step, as it begins.
+func _on_view_event(kind: String) -> void:
+	match kind:
+		"clear":
+			_sound.play(Sfx.CLEAR)
+		"spawn":
+			_sound.play(Sfx.PLACE)
+		"move":
+			_sound.play(Sfx.SELECT)
 
 
 func _on_finished(won: bool) -> void:
@@ -348,8 +378,10 @@ func _on_finished(won: bool) -> void:
 		progress.roll_period_if_needed()
 		if progress.record_clear(session.world_index, session.score):
 			progress.save()
+		_sound.play(Sfx.WIN)
 		_status_label.text = "THE KING HAS FALLEN"
 	else:
+		_sound.play(Sfx.BOO)
 		_status_label.text = "NO ROOM LEFT"
 	_rebuild_tools()
 

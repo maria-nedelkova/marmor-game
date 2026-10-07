@@ -461,3 +461,78 @@ func test_a_single_cell_path_does_not_break_the_glide() -> void:
 	assert_vector(view._moving_position(0.0)).is_equal(view.cell_center(Board.cell(3, 3)))
 	assert_vector(view._moving_position(1.0)).is_equal(view.cell_center(Board.cell(3, 3)))
 	scene.queue_free()
+
+
+# --- sound ------------------------------------------------------------------
+
+
+## Sound follows the VIEW, not the session. The session resolves a whole turn in
+## one call, so playing from its signals would fire the move, the clear and the
+## spawn in the same instant — the board would be silent while it animated and
+## then make every noise at once.
+func test_each_animation_step_announces_itself() -> void:
+	var scene := _world(0)
+	var view: Control = scene._board_view
+	var session: GameSession = scene.session
+
+	var occupied: Array[Vector2i] = session.board.occupied_cells()
+	var moved := false
+	for to in session.board.empty_cells():
+		if not MarmorEngine.find_path(session.board, occupied[0], to).is_empty():
+			session.tap(occupied[0])
+			session.tap(to)
+			moved = true
+			break
+	assert_bool(moved).is_true()
+
+	var kinds: Array[String] = []
+	view.event_started.connect(func(kind: String) -> void: kinds.append(kind))
+	for _i in 400:
+		view._process(0.05)
+		if not view.is_busy():
+			break
+
+	assert_array(kinds).override_failure_message("no steps announced").is_not_empty()
+	assert_bool(kinds.has("move")).override_failure_message("the move was silent").is_true()
+	scene.queue_free()
+
+
+func test_the_scene_owns_a_sound_bank_with_voices() -> void:
+	var scene := _world(0)
+	assert_object(scene._sound).is_not_null()
+	assert_int(scene._sound._players.size()).is_equal(8)
+	assert_bool(scene._sound.muted).is_false()
+	scene.queue_free()
+
+
+## Muting has to stop what is already sounding, not merely skip new effects —
+## otherwise the tail of a clear keeps playing after the player hits mute.
+func test_muting_stops_what_is_already_playing() -> void:
+	var scene := _world(0)
+	var bank: Node = scene._sound
+	bank.play(Sfx.CLEAR)
+	bank.muted = true
+	for player in bank._players:
+		assert_bool(player.playing).is_false()
+	scene.queue_free()
+
+
+func test_a_muted_bank_plays_nothing() -> void:
+	var scene := _world(0)
+	var bank: Node = scene._sound
+	bank.muted = true
+	bank.play(Sfx.SELECT)
+	for player in bank._players:
+		assert_bool(player.playing).is_false()
+	scene.queue_free()
+
+
+## The panel's sound key is the only way to reach the mute, so the wiring from
+## it has to hold.
+func test_the_sound_key_mutes_the_bank() -> void:
+	var scene := _world(0)
+	scene._panel.sound_toggled.emit(true)
+	assert_bool(scene._sound.muted).is_true()
+	scene._panel.sound_toggled.emit(false)
+	assert_bool(scene._sound.muted).is_false()
+	scene.queue_free()

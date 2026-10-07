@@ -25,6 +25,9 @@ signal cell_tapped(cell: Vector2i)
 ## Emitted when the queue drains, so the host can re-enable input and refresh
 ## anything that was waiting for the board to settle.
 signal animation_finished
+## Emitted as each queued step BEGINS, so a caller can sound it at the moment
+## it is seen rather than when the session decided it.
+signal event_started(kind: String)
 
 
 ## The grid's gradient: RADIAL from the board's centre — pink in the middle,
@@ -193,6 +196,7 @@ func _process(delta: float) -> void:
 			return
 		_current = _events.pop_front()
 		_elapsed = 0.0
+		event_started.emit(_current["type"])
 
 	_elapsed += delta
 	if _elapsed >= _duration(_current):
