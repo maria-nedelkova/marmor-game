@@ -73,6 +73,7 @@ func _layout() -> void:
 
 func _draw() -> void:
 	_draw_panel()
+	_draw_ornaments()
 	if session != null:
 		_draw_queue()
 	_draw_trinkets()
@@ -128,12 +129,48 @@ func _draw_queue() -> void:
 
 
 func _draw_marble(centre: Vector2, radius: float, color_index: int) -> void:
-	var palette: Array = BoardPalette.MARBLE_COLORS
-	var base: Color = palette[color_index % palette.size()]
-	draw_circle(centre, radius, base.darkened(0.45))
-	draw_circle(centre, radius * 0.86, base)
-	var lit := base.lightened(0.45)
-	draw_circle(centre - Vector2(radius * 0.3, radius * 0.3), radius * 0.32, Color(lit.r * 1.18, lit.g * 1.18, lit.b * 1.18))
+	Marble.draw_at(self, centre, radius, color_index)
+
+
+## The four inner corners: sparkles on one diagonal, hearts on the other.
+##
+## Opposite pairs rather than four of the same, which is what the reference
+## does — four identical corners read as a border treatment, where two of each
+## on crossing diagonals reads as decoration someone placed.
+func _draw_ornaments() -> void:
+	var inset := Vector2(72.0, 16.0)
+	var right := size.x - inset.x
+	var low := size.y - inset.y
+
+	_draw_sparkle(Vector2(inset.x, inset.y), 6.0, Color(1.75, 1.45, 0.55))
+	_draw_sparkle(Vector2(right, low), 6.0, Color(0.70, 1.70, 1.90))
+	_draw_heart(Vector2(inset.x, low), 5.0, Color(1.80, 0.50, 1.20))
+	_draw_heart(Vector2(right, inset.y), 5.0, Color(1.80, 0.50, 1.20))
+
+
+## A filled rhomb, not a cross of thin arms. At this size a thin cross is
+## nothing BUT its arms and reads as a plus sign — the body that makes a
+## sparkle a sparkle has to be filled in for it to be there at all.
+func _draw_sparkle(centre: Vector2, radius: float, tint: Color) -> void:
+	var waist := radius * 0.30
+	draw_colored_polygon(PackedVector2Array([
+		centre + Vector2(0.0, -radius), centre + Vector2(waist, 0.0),
+		centre + Vector2(0.0, radius), centre + Vector2(-waist, 0.0),
+	]), tint)
+	draw_colored_polygon(PackedVector2Array([
+		centre + Vector2(-radius, 0.0), centre + Vector2(0.0, -waist),
+		centre + Vector2(radius, 0.0), centre + Vector2(0.0, waist),
+	]), tint)
+
+
+func _draw_heart(centre: Vector2, radius: float, tint: Color) -> void:
+	draw_circle(centre + Vector2(-radius * 0.45, -radius * 0.3), radius * 0.55, tint)
+	draw_circle(centre + Vector2(radius * 0.45, -radius * 0.3), radius * 0.55, tint)
+	draw_colored_polygon(PackedVector2Array([
+		centre + Vector2(-radius, -radius * 0.18),
+		centre + Vector2(radius, -radius * 0.18),
+		centre + Vector2(0.0, radius),
+	]), tint)
 
 
 ## Star, coin, star, set into the bottom edge — the web version breaks its

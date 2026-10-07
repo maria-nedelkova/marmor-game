@@ -287,7 +287,7 @@ func _draw() -> void:
 			if cell == moving_from:
 				continue
 
-			var radius := s * 0.38
+			var radius := s * 0.37
 			if clearing.has(cell):
 				# Swell slightly, then collapse — a straight shrink reads as the
 				# marble falling through the board rather than being destroyed.
@@ -298,7 +298,7 @@ func _draw() -> void:
 				_draw_marble(cell_center(cell), radius, color_index)
 
 	if moving_from.x != -1:
-		_draw_marble(_moving_position(progress), s * 0.38, _current["color"])
+		_draw_marble(_moving_position(progress), s * 0.37, _current["color"])
 
 	# An armed tool tints the whole grid, so there is no way to be holding the
 	# hammer without noticing. A rack button alone is too easy to lose track of
@@ -360,12 +360,4 @@ func _moving_position(progress: float) -> Vector2:
 
 
 func _draw_marble(centre: Vector2, radius: float, color_index: int) -> void:
-	var base: Color = BoardPalette.MARBLE_COLORS[color_index % BoardPalette.MARBLE_COLORS.size()]
-	draw_circle(centre, radius, base.darkened(0.45))
-	draw_circle(centre, radius * 0.88, base)
-	var lit := base.lightened(0.45)
-	draw_circle(
-		centre - Vector2(radius * 0.3, radius * 0.3),
-		radius * 0.34,
-		Color(lit.r * HIGHLIGHT_GAIN, lit.g * HIGHLIGHT_GAIN, lit.b * HIGHLIGHT_GAIN, lit.a),
-	)
+	Marble.draw_at(self, centre, radius, color_index)

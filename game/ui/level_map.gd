@@ -105,18 +105,11 @@ func _ready() -> void:
 	_layout_nodes()
 
 
-## A fixed star field rather than a per-frame random one: stars that twinkle by
-## being redrawn in new places read as noise, not as sky.
+## The shared field: mixed sizes, four tints, rhomb sparkles and loose
+## constellations. See starfield.gd on why a uniform scatter of white dots
+## reads as noise rather than as sky.
 func _seed_stars() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 424242
-	_stars.clear()
-	for _i in 140:
-		_stars.append({
-			"pos": Vector2(rng.randf(), rng.randf()),
-			"radius": rng.randf_range(0.6, 2.1),
-			"alpha": rng.randf_range(0.18, 0.9),
-		})
+	_stars = Starfield.build(424242, 130, 6, 5)
 
 
 ## The title doubles as the way back here from a world — tapping the game name
@@ -269,12 +262,8 @@ func _draw() -> void:
 
 	# Stars skip the label rectangles for the same reason the route's dots do.
 	# A star behind transparent text is indistinguishable from a stray dot in
-	# the middle of a world's name, and it costs legibility for nothing.
-	for star in _stars:
-		var pos: Vector2 = (star["pos"] as Vector2) * size
-		if _is_on_a_label(pos):
-			continue
-		draw_circle(pos, star["radius"], Color(1.15, 1.22, 1.35, star["alpha"]))
+	# the middle of a world's name.
+	Starfield.draw_field(self, _stars, Rect2(Vector2.ZERO, size), _label_zones)
 
 	# The route, strictly between consecutive worlds. A segment is lit only if
 	# its destination is unlocked, so the line doubles as the progress bar.

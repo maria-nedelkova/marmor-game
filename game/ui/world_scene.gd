@@ -22,6 +22,7 @@ var _title: Button
 var _prompt_label: Label
 var _status_label: Label
 var _tool_bar: HBoxContainer
+var _stars: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -51,6 +52,7 @@ func start(index: int) -> void:
 
 func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_stars = Starfield.build(8080, 150, 7, 5)
 
 	# "LEVEL 1 — NEONIA-1". Also the way back to the map, as on the web.
 	_title = Button.new()
@@ -116,18 +118,22 @@ func _layout() -> void:
 	_title.position = Vector2(0.0, 6.0)
 	_title.size = Vector2(w, 30.0)
 
+	# Tall enough for a badge stacked over a mascot: 38 + 56 plus the gaps.
+	# At 80 the badges overlapped the title and the bar landed on the rack.
+	var duel_height := 108.0
 	_duel.position = Vector2(0.0, 38.0)
-	_duel.size = Vector2(w, 80.0)
+	_duel.size = Vector2(w, duel_height)
 
 	# Tools sit ABOVE the board, matching the web version's phone layout: name,
 	# duellists and progress, tools, board, controls pinned to the bottom.
-	_tool_bar.position = Vector2(10.0, 122.0)
+	var rack_top := 38.0 + duel_height + 8.0
+	_tool_bar.position = Vector2(10.0, rack_top)
 	_tool_bar.size = Vector2(w - 20.0, rack_height)
 
 	# A side margin so the board's neon frame is not clipped by the screen —
 	# the frame is drawn OUTSIDE the grid, so a board at full width loses it.
 	var side_margin := 14.0
-	var top := 122.0 + rack_height + 14.0
+	var top := rack_top + rack_height + 12.0
 	var bottom := panel_height + panel_margin + 16.0
 	_board_view.position = Vector2(side_margin, top)
 	_board_view.size = Vector2(w - side_margin * 2.0, maxf(0.0, size.y - top - bottom))
@@ -271,3 +277,7 @@ func _on_finished(won: bool) -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.075, 0.058, 0.155))
+	# Behind everything, and kept off the board — a star showing through the
+	# grid would be taken for a marble.
+	var board_zone := Rect2(_board_view.position, _board_view.size)
+	Starfield.draw_field(self, _stars, Rect2(Vector2.ZERO, size), [board_zone.grow(6.0)])
