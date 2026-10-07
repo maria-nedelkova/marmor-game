@@ -120,12 +120,13 @@ func _layout() -> void:
 
 	# Tall enough for a badge stacked over a mascot: 38 + 76 plus the gaps.
 	var duel_height := 128.0
-	_duel.position = Vector2(0.0, 6.0 + plaque_height + 2.0)
-	_duel.size = Vector2(w, duel_height)
+	var duel_top := 6.0 + plaque_height + 2.0
 
 	# Tools sit ABOVE the board, matching the web version's phone layout: name,
 	# duellists and progress, tools, board, controls pinned to the bottom.
 	var rack_top := 6.0 + plaque_height + 2.0 + duel_height + 8.0
+	# Positioned after the board so it can share the board's edges; the board
+	# block below sets no geometry the rack depends on.
 	_tool_bar.position = Vector2(10.0, rack_top)
 	_tool_bar.size = Vector2(w - 20.0, rack_height)
 
@@ -138,15 +139,27 @@ func _layout() -> void:
 	_board_view.position = Vector2(side_margin, top)
 	_board_view.size = Vector2(w - side_margin * 2.0, maxf(0.0, size.y - top - bottom))
 
+	# The board's real footprint, read off the board itself rather than
+	# recomputed here. The duel row and the control panel are set to THIS width,
+	# not the screen's, so the three stack as one column with one pair of edges
+	# — and reading it rather than repeating the formula is the only way they
+	# cannot drift apart when the board's sizing changes.
+	var board_cell: float = _board_view.cell_size()
+	var board_side := board_cell * Rules.SIZE
+	var board_origin: Vector2 = _board_view.board_origin()
+	var board_left := _board_view.position.x + board_origin.x
+
+	_duel.position = Vector2(board_left, duel_top)
+	_duel.size = Vector2(board_side, duel_height)
+
+	_panel.position = Vector2(board_left, size.y - panel_height - panel_margin)
+	_panel.size = Vector2(board_side, panel_height)
+
 	# Under the board, not above it. Above, it landed on the board's own frame
 	# — and the space under the board was empty anyway, which is where a line
 	# telling the player what the board wants should be.
-	var board_side := _board_view.size.x
 	_prompt_label.position = Vector2(0.0, top + board_side + 18.0)
 	_prompt_label.size = Vector2(w, 20.0)
-
-	_panel.position = Vector2(12.0, size.y - panel_height - panel_margin)
-	_panel.size = Vector2(w - 24.0, panel_height)
 
 	_status_label.position = Vector2(0.0, top + _board_view.size.y * 0.5 - 12.0)
 	_status_label.size = Vector2(w, 24.0)

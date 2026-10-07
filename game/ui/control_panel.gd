@@ -21,7 +21,7 @@ const PANEL_FILL := Color(0.055, 0.075, 0.185, 0.92)
 const CORNER_RADIUS := 14.0
 
 const KEY_SIZE := 44.0
-const QUEUE_MARBLE := 26.0
+const QUEUE_MARBLE := 36.0
 
 var session: GameSession
 var muted := false
@@ -178,13 +178,13 @@ func _draw_heart(centre: Vector2, radius: float, tint: Color) -> void:
 ## the panel and over a band of the fill colour.
 func _draw_trinkets() -> void:
 	var y := size.y
-	var band := Vector2(84.0, 14.0)
+	var band := Vector2(118.0, 20.0)
 	draw_rect(Rect2(Vector2((size.x - band.x) * 0.5, y - band.y * 0.5), band), Color(0.035, 0.027, 0.08))
 
 	var centre := Vector2(size.x * 0.5, y)
-	_draw_star(centre + Vector2(-26.0, 0.0), 6.0, Color(0.55, 1.65, 1.85))
-	_draw_coin(centre, 6.0)
-	_draw_star(centre + Vector2(26.0, 0.0), 6.0, Color(1.75, 1.35, 0.42))
+	_draw_star(centre + Vector2(-36.0, 0.0), 9.0, Color(0.55, 1.65, 1.85))
+	_draw_coin(centre, 9.0)
+	_draw_star(centre + Vector2(36.0, 0.0), 9.0, Color(1.75, 1.35, 0.42))
 
 
 func _draw_star(centre: Vector2, radius: float, tint: Color) -> void:
