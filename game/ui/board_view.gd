@@ -53,12 +53,14 @@ const GRID_GAIN := 1.30
 ## box-shadows add up to. The glow itself is the WorldEnvironment's job rather
 ## than four shadow layers.
 ##
-## Both sit only just over the bloom threshold. The frame is the longest lit
-## edge on the screen — four sides of a near-full-width square — so it spreads
-## far more light than its brightness alone suggests, and at the values the
-## plaque and panel use it washed the whole board area.
-const FRAME_CORE := Color(1.32, 1.24, 1.30)      # #fff2fb, just lit
-const FRAME_EDGE := Color(1.22, 0.34, 0.76)      # #ff52c8, just lit
+## Both sit well over the bloom threshold — the frame is meant to be the
+## brightest thing on the board. It is also the longest lit edge on the screen,
+## four sides of a near-full-width square, so it spreads considerably more
+## light than its brightness alone suggests: these were dialled back once for
+## washing out the board area and then brought up again, and this is the
+## middle ground. Past roughly 1.9 the wash returns.
+const FRAME_CORE := Color(1.78, 1.66, 1.74)      # #fff2fb, lit
+const FRAME_EDGE := Color(1.62, 0.40, 0.98)      # #ff52c8, lit
 const FRAME_THICKNESS := 4.0
 
 const BOARD_BG := Color(0.10, 0.07, 0.19)

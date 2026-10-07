@@ -201,13 +201,20 @@ func _queue_width() -> float:
 	return count * diameter + (count - 1) * 22.0
 
 
-## Scattered, not set at four tidy corners — four ornaments at the corners read
-## as a border treatment, where jittered sizes and positions read as decoration
-## someone placed.
+## Stratified, not scattered. Each band is divided into a 3x2 grid of slots and
+## one ornament is placed per slot, jittered within it.
 ##
-## Each is assigned a SIDE up front and then placed within that side's band, so
-## both sides get a fair share and none is thrown away. Seeded, so the scatter
-## is the same every launch: decoration that moves between redraws is noise.
+## Pure random placement within a band looks uneven at this count: a dozen
+## samples clump and leave holes, and the eye reads the holes. Stratifying
+## guarantees the spread while the jitter keeps it off a visible grid — even
+## without being regular, which is what "harmonic" asks for and what random
+## alone will not give you.
+##
+## Seeded, so the arrangement is the same every launch: decoration that moves
+## between redraws is noise.
+const ORNAMENT_COLS := 3
+const ORNAMENT_ROWS := 2
+
 func _seed_ornaments() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 90210
@@ -216,17 +223,21 @@ func _seed_ornaments() -> void:
 		Color(1.80, 0.50, 1.20), Color(1.55, 1.60, 1.85),
 	]
 	_ornaments.clear()
-	for i in 12:
-		_ornaments.append({
-			# Alternating rather than random, so neither band can come out
-			# empty on a given seed.
-			"side": i % 2,
-			"x": rng.randf(),
-			"y": rng.randf(),
-			"size": rng.randf_range(3.0, 7.0),
-			"heart": rng.randf() < 0.4,
-			"tint": tints[rng.randi_range(0, tints.size() - 1)],
-		})
+	for side in 2:
+		for slot in ORNAMENT_COLS * ORNAMENT_ROWS:
+			var col := slot % ORNAMENT_COLS
+			var row := slot / ORNAMENT_COLS
+			_ornaments.append({
+				"side": side,
+				# Centre of the slot, nudged by up to a third of it either way.
+				"x": (col + 0.5 + rng.randf_range(-0.30, 0.30)) / float(ORNAMENT_COLS),
+				"y": (row + 0.5 + rng.randf_range(-0.28, 0.28)) / float(ORNAMENT_ROWS),
+				# Size alternates band to band rather than being free, so each
+				# band gets both large and small rather than one of each by luck.
+				"size": 6.6 if slot % 2 == 0 else 4.0,
+				"heart": (slot + side) % 3 == 0,
+				"tint": tints[(slot + side * 2) % tints.size()],
+			})
 
 
 
