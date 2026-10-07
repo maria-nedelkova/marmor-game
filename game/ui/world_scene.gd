@@ -77,6 +77,7 @@ func _build() -> void:
 	_board_view = Control.new()
 	_board_view.set_script(BoardViewScript)
 	_board_view.mouse_filter = Control.MOUSE_FILTER_STOP
+	_board_view.stars = _stars
 	_board_view.cell_tapped.connect(_on_cell_tapped)
 	_board_view.animation_finished.connect(_refresh)
 	add_child(_board_view)
@@ -121,12 +122,14 @@ func _layout() -> void:
 	var rack_height := 42.0
 
 	var plaque_height := 112.0
-	_title.position = Vector2(0.0, 6.0)
+	# Clear space above the plaque, so it is not jammed against the top edge.
+	var top_margin := 30.0
+	_title.position = Vector2(0.0, top_margin)
 	_title.size = Vector2(w, plaque_height)
 
 	# Tall enough for a badge stacked over a mascot: 38 + 76 plus the gaps.
 	var duel_height := 128.0
-	var duel_top := 6.0 + plaque_height + 2.0
+	var duel_top := top_margin + plaque_height + 2.0
 
 	# Tools sit ABOVE the board, matching the web version's phone layout: name,
 	# duellists and progress, tools, board, controls pinned to the bottom.
@@ -140,6 +143,7 @@ func _layout() -> void:
 	var side_margin := 0.0
 	var top := rack_top + rack_height + 12.0
 	var bottom := panel_height + panel_margin + 16.0
+	_board_view.star_area = Rect2(Vector2.ZERO, size)
 	_board_view.position = Vector2(side_margin, top)
 	_board_view.size = Vector2(w - side_margin * 2.0, maxf(0.0, size.y - top - bottom))
 
@@ -297,7 +301,11 @@ func _on_finished(won: bool) -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.075, 0.058, 0.155))
-	# Behind everything, and kept off the board — a star showing through the
-	# grid would be taken for a marble.
-	var board_zone := Rect2(_board_view.position, _board_view.size)
-	Starfield.draw_field(self, _stars, Rect2(Vector2.ZERO, size), [board_zone.grow(6.0)])
+	# Behind everything. The board draws its own share — see board_view._draw_stars
+	# — so the field skips the grid here rather than painting under a fill that
+	# would hide it.
+	var board_zone := Rect2(
+		_board_view.position + _board_view.board_origin(),
+		Vector2.ONE * _board_view.cell_size() * Rules.SIZE,
+	)
+	Starfield.draw_field(self, _stars, Rect2(Vector2.ZERO, size), [board_zone.grow(2.0)])

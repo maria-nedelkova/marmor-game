@@ -115,6 +115,15 @@ var _reachable_for := Vector2i(-2, -2)
 ## blink together. The web has to force-restart each dot's animation to get
 ## this; one clock gets it for free.
 var _blink := 0.0
+## The sky behind the grid.
+##
+## Drawn HERE rather than by the host, even though the host owns the field.
+## This is a child Control, so its background fill paints over whatever the
+## parent drew — stars behind the grid were simply invisible until the board
+## drew them itself. `star_area` is the host's rect, because star positions are
+## fractions of the whole screen and have to keep their place in it.
+var stars: Array[Dictionary] = []
+var star_area := Rect2()
 
 
 func _ready() -> void:
@@ -312,6 +321,7 @@ func _draw() -> void:
 	var side := s * Rules.SIZE
 
 	draw_rect(Rect2(origin, Vector2(side, side)), BOARD_BG)
+	_draw_stars(Rect2(origin, Vector2(side, side)))
 	_draw_grid(origin, s, side)
 	_draw_frame(origin, side)
 
@@ -379,6 +389,24 @@ func _draw() -> void:
 	# when the board is where you are looking.
 	if session.is_armed():
 		draw_rect(Rect2(origin, Vector2(side, side)), Color(ARMED_WASH.r, ARMED_WASH.g, ARMED_WASH.b, 0.05))
+
+
+## Only the small plain stars, and only inside the grid. The sky should carry
+## on through the board rather than stop at it, but a large star or a rhomb
+## sparkle in there would be mistaken for a piece.
+func _draw_stars(grid: Rect2) -> void:
+	if stars.is_empty() or star_area.size.x <= 0.0:
+		return
+	for star in stars:
+		if star["sparkle"] or star["radius"] > 1.5:
+			continue
+		# Positions are fractions of the host's rect; this control is offset
+		# inside it, so they come back to local space by subtracting position.
+		var at: Vector2 = star_area.position + (star["pos"] as Vector2) * star_area.size - position
+		if not grid.has_point(at):
+			continue
+		var tint: Color = star["tint"]
+		draw_circle(at, star["radius"], Color(tint.r, tint.g, tint.b, float(star["alpha"]) * 0.8))
 
 
 ## Samples the radial gradient at a point, by its distance from the board's

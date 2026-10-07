@@ -90,14 +90,26 @@ static func build(
 	return out
 
 
-## Draws the field into `area`. `exclude` is a list of rectangles the stars keep
-## out of — a star behind transparent text is indistinguishable from a stray dot
-## in the middle of a word.
+## Draws the field into `area`.
+##
+## `exclude` is where no star may go at all — a star behind transparent text is
+## indistinguishable from a stray dot in the middle of a word.
+##
+## `faint_only` is different and softer: stars still appear there, but only the
+## small plain ones. It exists for the board, which the sky should show through
+## rather than stop at — the web paints stars over its cells too — while a
+## large star or a rhomb sparkle inside the grid would be mistaken for a piece.
 static func draw_field(
-	canvas: CanvasItem, stars: Array[Dictionary], area: Rect2, exclude: Array[Rect2] = []
+	canvas: CanvasItem,
+	stars: Array[Dictionary],
+	area: Rect2,
+	exclude: Array[Rect2] = [],
+	faint_only: Array[Rect2] = [],
+	faint_limit: float = 1.5,
 ) -> void:
 	for star in stars:
 		var at: Vector2 = area.position + (star["pos"] as Vector2) * area.size
+
 		var skip := false
 		for zone in exclude:
 			if zone.has_point(at):
@@ -106,12 +118,22 @@ static func draw_field(
 		if skip:
 			continue
 
+		var radius: float = star["radius"]
+		var sparkle: bool = star["sparkle"]
+		var restricted := false
+		for zone in faint_only:
+			if zone.has_point(at):
+				restricted = true
+				break
+		if restricted and (sparkle or radius > faint_limit):
+			continue
+
 		var tint: Color = star["tint"]
 		var color := Color(tint.r, tint.g, tint.b, star["alpha"])
-		if star["sparkle"]:
-			_draw_sparkle(canvas, at, star["radius"], color)
+		if sparkle:
+			_draw_sparkle(canvas, at, radius, color)
 		else:
-			canvas.draw_circle(at, star["radius"], color)
+			canvas.draw_circle(at, radius, color)
 
 
 ## A four-pointed rhomb, not a disc — the shape the web draws as an inline SVG
