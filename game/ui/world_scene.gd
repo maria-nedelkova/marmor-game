@@ -11,6 +11,7 @@ signal exit_requested
 const BoardViewScript := preload("res://game/ui/board_view.gd")
 const DuelHeaderScript := preload("res://game/ui/duel_header.gd")
 const ControlPanelScript := preload("res://game/ui/control_panel.gd")
+const PlaqueScript := preload("res://game/ui/plaque.gd")
 
 var session: GameSession
 var world_index: int = 0
@@ -18,7 +19,7 @@ var world_index: int = 0
 var _board_view: Control
 var _duel: Control
 var _panel: Control
-var _title: Button
+var _title: Control
 var _prompt_label: Label
 var _status_label: Label
 var _tool_bar: HBoxContainer
@@ -54,13 +55,11 @@ func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_stars = Starfield.build(8080, 150, 7, 5)
 
-	# "LEVEL 1 — NEONIA-1". Also the way back to the map, as on the web.
-	_title = Button.new()
-	_title.flat = true
-	_title.focus_mode = Control.FOCUS_NONE
-	_title.add_theme_color_override("font_color", Color(1.85, 1.12, 1.7))
-	_title.add_theme_font_size_override("font_size", 22)
-	_title.tooltip_text = "Back to the map"
+	# "LEVEL 6" over "TERRA-FORMER" in a stepped neon plaque. Also the way back
+	# to the map, as on the web.
+	_title = Control.new()
+	_title.set_script(PlaqueScript)
+	_title.mouse_filter = Control.MOUSE_FILTER_STOP
 	_title.pressed.connect(func() -> void:
 		if _board_view != null:
 			_board_view.settle()
@@ -115,18 +114,19 @@ func _layout() -> void:
 	var panel_margin := 22.0
 	var rack_height := 42.0
 
+	var plaque_height := 88.0
 	_title.position = Vector2(0.0, 6.0)
-	_title.size = Vector2(w, 30.0)
+	_title.size = Vector2(w, plaque_height)
 
 	# Tall enough for a badge stacked over a mascot: 38 + 56 plus the gaps.
 	# At 80 the badges overlapped the title and the bar landed on the rack.
 	var duel_height := 108.0
-	_duel.position = Vector2(0.0, 38.0)
+	_duel.position = Vector2(0.0, 6.0 + plaque_height + 2.0)
 	_duel.size = Vector2(w, duel_height)
 
 	# Tools sit ABOVE the board, matching the web version's phone layout: name,
 	# duellists and progress, tools, board, controls pinned to the bottom.
-	var rack_top := 38.0 + duel_height + 8.0
+	var rack_top := 6.0 + plaque_height + 2.0 + duel_height + 8.0
 	_tool_bar.position = Vector2(10.0, rack_top)
 	_tool_bar.size = Vector2(w - 20.0, rack_height)
 
@@ -155,7 +155,7 @@ func _layout() -> void:
 func _refresh() -> void:
 	if session == null:
 		return
-	_title.text = "LEVEL %d  —  %s" % [session.world_index + 1, session.world["name"]]
+	_title.set_lines("LEVEL %d" % (session.world_index + 1), session.world["name"])
 	_prompt_label.text = session.prompt()
 	_rebuild_tools()
 	if _board_view != null:
