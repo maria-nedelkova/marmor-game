@@ -148,7 +148,8 @@ func _draw_queue() -> void:
 		return
 	var cell := size.x / float(Rules.SIZE)
 	var diameter := cell * QUEUE_SCALE
-	var gap := 10.0
+	# Wide enough that three marbles read as three, not as a run.
+	var gap := 22.0
 	var total := colors.size() * diameter + (colors.size() - 1) * gap
 	var at := Vector2((size.x - total) * 0.5 + diameter * 0.5, size.y * 0.5)
 	for i in colors.size():

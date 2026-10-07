@@ -20,7 +20,10 @@ class_name Marble
 const RIM := Color(0.0, 0.0, 0.0, 0.55)
 const SHADOW := Color(0.0, 0.0, 0.0, 0.55)
 const UNDERSIDE := Color(0.0, 0.0, 0.0, 0.22)
-const HIGHLIGHT := Color(1.35, 1.35, 1.35, 0.82)
+## Only just over the bloom threshold. Higher and every highlight blooms into
+## a soft white dot, which costs the hard rectangular edge that makes the
+## marble read as pixel art in the first place.
+const HIGHLIGHT := Color(1.08, 1.08, 1.10, 0.82)
 
 
 ## `radius` is the marble's outer radius. The web sizes a marble at 74% of its
@@ -33,11 +36,15 @@ static func draw_at(canvas: CanvasItem, centre: Vector2, radius: float, color_in
 	var offset := maxf(1.0, radius * 0.07)
 
 	# The web's `0 0 12px var(--glow)` — each marble lights the board in its own
-	# colour. Drawn as two faint discs rather than one, so the falloff has a
-	# shape instead of a visible edge. Kept dim: at full strength 81 of these
-	# turn the board into a lamp.
-	canvas.draw_circle(centre, radius * 1.55, Color(base.r, base.g, base.b, 0.10))
-	canvas.draw_circle(centre, radius * 1.25, Color(base.r, base.g, base.b, 0.14))
+	# colour. Two faint discs rather than one, so the falloff has a shape
+	# instead of a visible edge.
+	#
+	# Deliberately very faint. There are up to 81 of these on screen at once, so
+	# a halo that looks right on a single marble adds up to a lit board; what
+	# reads correctly here is the suggestion of a glow rather than one you would
+	# pick out if you looked at one marble alone.
+	canvas.draw_circle(centre, radius * 1.55, Color(base.r, base.g, base.b, 0.045))
+	canvas.draw_circle(centre, radius * 1.25, Color(base.r, base.g, base.b, 0.065))
 
 	# Hard offset shadow, drawn first and never blurred — a soft shadow is what
 	# makes a pixel-art marble look like a sprite from a different game.

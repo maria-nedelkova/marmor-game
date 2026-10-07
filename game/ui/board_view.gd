@@ -45,26 +45,23 @@ const GRID_CENTRE := Color(1.00, 0.36, 0.78)   # #ec6fc0, pushed
 const GRID_MID := Color(0.70, 0.38, 0.88)      # #ab63d4
 const GRID_EDGE := Color(0.38, 0.33, 0.90)     # #7268cf, pushed
 const GRID_MID_STOP := 0.42
-## The grid is lit, so it crosses the bloom threshold. Low, per HIGHLIGHT_GAIN.
+## The grid is lit, so it crosses the bloom threshold, but only just.
 const GRID_GAIN := 1.30
 
 ## The board's neon frame: a near-white core with pink either side, which is
 ## what the web version's `border: 1px solid #fff2fb` plus its stacked pink
-## box-shadows add up to. The glow itself is the WorldEnvironment's job now
-## rather than four shadow layers.
-const FRAME_CORE := Color(2.0, 1.85, 1.95)       # #fff2fb, driven hot
-const FRAME_EDGE := Color(1.85, 0.42, 1.05)      # #ff52c8, driven hot
+## box-shadows add up to. The glow itself is the WorldEnvironment's job rather
+## than four shadow layers.
+##
+## Both sit only just over the bloom threshold. The frame is the longest lit
+## edge on the screen — four sides of a near-full-width square — so it spreads
+## far more light than its brightness alone suggests, and at the values the
+## plaque and panel use it washed the whole board area.
+const FRAME_CORE := Color(1.32, 1.24, 1.30)      # #fff2fb, just lit
+const FRAME_EDGE := Color(1.22, 0.34, 0.76)      # #ff52c8, just lit
 const FRAME_THICKNESS := 4.0
 
 const BOARD_BG := Color(0.10, 0.07, 0.19)
-## Multiplier for a marble's specular highlight. The highlight is the only part
-## of a marble that blooms — pushing the whole disc over the threshold turns 81
-## marbles into 81 lamps and the board washes out.
-##
-## Low, for the same reason as the map's HDR_GAIN: at 1.55 every highlight
-## clipped to flat white, so a red marble and a blue one had identical white
-## dots on them.
-const HIGHLIGHT_GAIN := 1.18
 ## The selected cell, from the web's `.cell.selected`:
 ##   background: #182055;  box-shadow: inset 0 0 0 3px var(--mr-accent)
 ## with --mr-accent #29f1ff. The CELL is lit, not the marble — a ring behind
