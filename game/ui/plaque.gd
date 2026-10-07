@@ -43,7 +43,11 @@ const POINT_BASE := 26.0
 const POINT_STEPS := 5
 
 const PAD_X := 30.0
-const PAD_Y := 14.0
+const PAD_Y := 16.0
+## Between the two lines. Generous on purpose: they are different sizes and
+## different colours, and a tight gap made them read as one block of text
+## rather than as a heading with a subtitle under it.
+const ROW_GAP := 16.0
 const MIN_WIDTH := 210.0
 
 ## LEVEL N leads and the world's name sits under it, smaller.
@@ -61,7 +65,16 @@ const MIN_WIDTH := 210.0
 ## afford.
 const LEVEL_SCALE_MAX := 4
 const LEVEL_SCALE_MIN := 3
-const NAME_SCALE_MAX := 3
+## The name sits two steps under the level line rather than one. At scale 3 it
+## competed with LEVEL N for the eye; at 2 the pair reads as a heading with a
+## subtitle, which is what it is.
+##
+## Headroom check, since the shrink loop can no longer do much: the longest
+## name is CELESTIAL RING STATION at 22 characters, which is 262px at scale 2
+## against roughly 600px of available width. If names ever grow past about 45
+## characters the floor needs lowering again, or the plaque will overflow
+## rather than shrink.
+const NAME_SCALE_MAX := 2
 const NAME_SCALE_MIN := 2
 
 const FILL := Color(0.043, 0.035, 0.125)
@@ -137,7 +150,7 @@ func _measure() -> void:
 	var name_w := PixelFont.measure(name_text, _name_size)
 	var level_w := PixelFont.measure(level_text, _level_size)
 	var width := clampf(maxf(name_w, level_w) + PAD_X * 2.0, MIN_WIDTH, available)
-	var height := PixelFont.height(_level_size) + PixelFont.height(_name_size) + PAD_Y * 2.0 + 8.0
+	var height := PixelFont.height(_level_size) + PixelFont.height(_name_size) + PAD_Y * 2.0 + ROW_GAP
 	_plaque = Rect2(Vector2((size.x - width) * 0.5, 2.0), Vector2(width, height))
 
 
@@ -215,7 +228,7 @@ func _draw() -> void:
 	var level_h := PixelFont.height(_level_size)
 	PixelFont.draw_centered(self, level_text, cx, _plaque.position.y + PAD_Y, _level_size, INK_LEVEL)
 	PixelFont.draw_centered(
-		self, name_text, cx, _plaque.position.y + PAD_Y + level_h + 8.0, _name_size, INK,
+		self, name_text, cx, _plaque.position.y + PAD_Y + level_h + ROW_GAP, _name_size, INK,
 	)
 
 	_draw_specks()
