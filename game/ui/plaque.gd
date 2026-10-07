@@ -28,12 +28,19 @@ signal pressed
 
 ## Corner cut, built from three steps of CUT / STEPS. A single diagonal would
 ## be a chamfer; the staircase is what reads as pixel art.
-const CUT := 22.0
-const STEPS := 3
+const CUT := 24.0
+## Six steps rather than three. More, smaller steps read as a finer pixel grid
+## — the staircase is still the point, but at three steps each tread was large
+## enough to look like a chamfer with notches rather than like pixel art.
+const STEPS := 6
 ## How far each end is drawn out past the body, and how tall the point's base
 ## is. A shallow point reads as a mistake; this is deep enough to be a shape.
-const POINT := 20.0
-const POINT_BASE := 16.0
+## The end points are shallower and wider than before, so their edges run
+## closer to straight — a steep point reads as an arrowhead, a shallow one as a
+## banner. Built as a staircase too, for the same reason the corners are.
+const POINT := 16.0
+const POINT_BASE := 26.0
+const POINT_STEPS := 5
 
 const PAD_X := 30.0
 const PAD_Y := 14.0
@@ -50,8 +57,10 @@ const FILL := Color(0.043, 0.035, 0.125)
 const EDGE_TOP := Color(0.45, 1.55, 1.85)
 const EDGE_BOTTOM := Color(1.85, 0.48, 1.20)
 ## The reference's title pink, used for both lines.
-const INK := Color(1.95, 0.62, 1.45)
-const INK_LEVEL := Color(1.80, 0.78, 1.55)
+## Light pink, as in the reference — closer to rose than to magenta. The darker
+## magenta read as a different colour from the title it was copied from.
+const INK := Color(2.00, 1.32, 1.85)
+const INK_LEVEL := Color(1.92, 1.45, 1.86)
 
 var level_text := ""
 var name_text := ""
@@ -124,9 +133,15 @@ func _outline() -> PackedVector2Array:
 		points.append(Vector2(x, y))
 		points.append(Vector2(x, y + s))
 
-	# Right-hand point.
+	# Right-hand point, stepped out and back.
 	points.append(Vector2(p.end.x, mid - POINT_BASE))
-	points.append(Vector2(p.end.x + POINT, mid))
+	for i in POINT_STEPS:
+		var t := float(i + 1) / float(POINT_STEPS)
+		points.append(Vector2(p.end.x + POINT * t, mid - POINT_BASE * (1.0 - t)))
+		points.append(Vector2(p.end.x + POINT * t, mid - POINT_BASE * (1.0 - t) + POINT_BASE / POINT_STEPS))
+	for i in POINT_STEPS:
+		var t := 1.0 - float(i + 1) / float(POINT_STEPS)
+		points.append(Vector2(p.end.x + POINT * t, mid + POINT_BASE * (1.0 - t)))
 	points.append(Vector2(p.end.x, mid + POINT_BASE))
 
 	points.append(Vector2(p.end.x, p.end.y - CUT))
@@ -143,9 +158,15 @@ func _outline() -> PackedVector2Array:
 		points.append(Vector2(x, y))
 		points.append(Vector2(x, y - s))
 
-	# Left-hand point.
+	# Left-hand point, the mirror of the right.
 	points.append(Vector2(p.position.x, mid + POINT_BASE))
-	points.append(Vector2(p.position.x - POINT, mid))
+	for i in POINT_STEPS:
+		var t := float(i + 1) / float(POINT_STEPS)
+		points.append(Vector2(p.position.x - POINT * t, mid + POINT_BASE * (1.0 - t)))
+		points.append(Vector2(p.position.x - POINT * t, mid + POINT_BASE * (1.0 - t) - POINT_BASE / POINT_STEPS))
+	for i in POINT_STEPS:
+		var t := 1.0 - float(i + 1) / float(POINT_STEPS)
+		points.append(Vector2(p.position.x - POINT * t, mid - POINT_BASE * (1.0 - t)))
 	points.append(Vector2(p.position.x, mid - POINT_BASE))
 
 	points.append(Vector2(p.position.x, p.position.y + CUT))

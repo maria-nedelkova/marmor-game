@@ -18,10 +18,17 @@ signal sound_toggled(muted: bool)
 const EDGE_TOP := Color(0.39, 1.62, 1.79)
 const EDGE_BOTTOM := Color(1.87, 0.42, 1.10)
 const PANEL_FILL := Color(0.055, 0.075, 0.185, 0.92)
+## Icon white. Slightly over 1.0 so the line art picks up the same bloom the
+## rest of the chrome does rather than sitting flat against a lit frame.
+const ICON := Color(1.45, 1.50, 1.60)
 const CORNER_RADIUS := 14.0
 
-const KEY_SIZE := 44.0
-const QUEUE_MARBLE := 36.0
+const KEY_SIZE := 52.0
+## Queue marbles are drawn at the BOARD's marble size, not a fixed one. The
+## panel is set to the board's width, so the board's cell is panel width / 9 —
+## which means the queue can match the board without being told the board's
+## geometry. A fixed size drifted every time the board's sizing changed.
+const QUEUE_SCALE := 0.74
 
 var session: GameSession
 var muted := false
@@ -31,27 +38,29 @@ var _sound: Button
 
 
 func _ready() -> void:
-	_restart = _make_key("RST", "Restart this world")
+	_restart = _make_key("Restart this world")
 	_restart.pressed.connect(func() -> void: restart_pressed.emit())
 
-	_sound = _make_key("SND", "Mute or unmute")
+	_sound = _make_key("Mute or unmute")
 	_sound.pressed.connect(func() -> void:
 		muted = not muted
-		_sound.text = "OFF" if muted else "SND"
+		queue_redraw()
 		sound_toggled.emit(muted))
 
 	resized.connect(_layout)
 	_layout()
 
 
-func _make_key(text: String, tip: String) -> Button:
+## The keys are invisible Buttons — hit targets only. Their frame and icon are
+## drawn by the panel, because a gradient border is not something a StyleBox
+## can express and the icons are line art rather than glyphs in a font.
+func _make_key(tip: String) -> Button:
 	var button := Button.new()
-	button.text = text
+	button.flat = true
 	button.focus_mode = Control.FOCUS_NONE
 	button.tooltip_text = tip
 	button.custom_minimum_size = Vector2(KEY_SIZE, KEY_SIZE)
 	button.size = button.custom_minimum_size
-	button.add_theme_font_size_override("font_size", 12)
 	add_child(button)
 	return button
 
@@ -73,6 +82,7 @@ func _layout() -> void:
 
 func _draw() -> void:
 	_draw_panel()
+	_draw_keys()
 	_draw_ornaments()
 	if session != null:
 		_draw_queue()
@@ -121,11 +131,13 @@ func _draw_queue() -> void:
 	var colors := session.next_queue
 	if colors.is_empty():
 		return
-	var gap := 8.0
-	var total := colors.size() * QUEUE_MARBLE + (colors.size() - 1) * gap
-	var at := Vector2((size.x - total) * 0.5 + QUEUE_MARBLE * 0.5, size.y * 0.5)
+	var cell := size.x / float(Rules.SIZE)
+	var diameter := cell * QUEUE_SCALE
+	var gap := 10.0
+	var total := colors.size() * diameter + (colors.size() - 1) * gap
+	var at := Vector2((size.x - total) * 0.5 + diameter * 0.5, size.y * 0.5)
 	for i in colors.size():
-		_draw_marble(at + Vector2(i * (QUEUE_MARBLE + gap), 0.0), QUEUE_MARBLE * 0.5, colors[i])
+		_draw_marble(at + Vector2(i * (diameter + gap), 0.0), diameter * 0.5, colors[i])
 
 
 func _draw_marble(centre: Vector2, radius: float, color_index: int) -> void:
@@ -178,13 +190,13 @@ func _draw_heart(centre: Vector2, radius: float, tint: Color) -> void:
 ## the panel and over a band of the fill colour.
 func _draw_trinkets() -> void:
 	var y := size.y
-	var band := Vector2(118.0, 20.0)
+	var band := Vector2(160.0, 26.0)
 	draw_rect(Rect2(Vector2((size.x - band.x) * 0.5, y - band.y * 0.5), band), Color(0.035, 0.027, 0.08))
 
 	var centre := Vector2(size.x * 0.5, y)
-	_draw_star(centre + Vector2(-36.0, 0.0), 9.0, Color(0.55, 1.65, 1.85))
-	_draw_coin(centre, 9.0)
-	_draw_star(centre + Vector2(36.0, 0.0), 9.0, Color(1.75, 1.35, 0.42))
+	_draw_star(centre + Vector2(-48.0, 0.0), 12.0, Color(0.55, 1.65, 1.85))
+	_draw_coin(centre, 12.0)
+	_draw_star(centre + Vector2(48.0, 0.0), 12.0, Color(1.75, 1.35, 0.42))
 
 
 func _draw_star(centre: Vector2, radius: float, tint: Color) -> void:
@@ -199,3 +211,81 @@ func _draw_star(centre: Vector2, radius: float, tint: Color) -> void:
 func _draw_coin(centre: Vector2, radius: float) -> void:
 	draw_circle(centre, radius, Color(1.6, 1.15, 0.30))
 	draw_circle(centre, radius * 0.55, Color(1.85, 1.55, 0.60))
+
+
+## The two keys: a gradient-bordered rounded square with white line art inside.
+##
+## Both the frame and the icon are drawn rather than themed. A StyleBox takes a
+## single border colour, and the icons are strokes rather than glyphs — a font
+## would mean shipping one for two symbols.
+func _draw_keys() -> void:
+	if _restart == null:
+		return
+	_draw_key_frame(Rect2(_restart.position, _restart.size))
+	_draw_key_frame(Rect2(_sound.position, _sound.size))
+	_draw_restart_icon(Rect2(_restart.position, _restart.size))
+	_draw_sound_icon(Rect2(_sound.position, _sound.size))
+
+
+## Same vertical cyan-to-pink gradient as the panel's own edge, drawn as
+## horizontal slices for the same reason.
+func _draw_key_frame(box: Rect2) -> void:
+	var radius := 10.0
+	var thickness := 2.0
+	draw_rect(box.grow(-thickness), Color(0.05, 0.07, 0.17, 0.95))
+
+	var rows := int(box.size.y)
+	for y in rows:
+		var t := float(y) / maxf(1.0, float(rows - 1))
+		var tint := EDGE_TOP.lerp(EDGE_BOTTOM, t)
+		var distance := minf(float(y), float(rows - 1 - y))
+		var inset := 0.0
+		if distance < radius:
+			var d := radius - distance
+			inset = radius - sqrt(maxf(0.0, radius * radius - d * d))
+		var at_y := box.position.y + y
+		draw_rect(Rect2(box.position.x + inset, at_y, thickness, 1.0), tint)
+		draw_rect(Rect2(box.position.x + box.size.x - inset - thickness, at_y, thickness, 1.0), tint)
+		if y < thickness or y >= rows - thickness:
+			draw_rect(Rect2(box.position.x + inset, at_y, box.size.x - inset * 2.0, 1.0), tint)
+
+
+## Three bars. The reference's left key is a hamburger; this one restarts
+## rather than opening a menu, but the shape is the one the panel is built
+## around and a different glyph here would unbalance the two ends.
+func _draw_restart_icon(box: Rect2) -> void:
+	var w := box.size.x * 0.42
+	var cx := box.position.x + box.size.x * 0.5
+	var cy := box.position.y + box.size.y * 0.5
+	for i in 3:
+		var y := cy + (i - 1) * 7.0
+		draw_rect(Rect2(cx - w * 0.5, y - 1.5, w, 3.0), ICON)
+
+
+## A speaker cone with two arcs, or with a cross when muted — the state has to
+## be visible without tapping it to find out.
+func _draw_sound_icon(box: Rect2) -> void:
+	var cx := box.position.x + box.size.x * 0.5
+	var cy := box.position.y + box.size.y * 0.5
+	var s := box.size.x * 0.1
+
+	# Body and cone.
+	draw_rect(Rect2(cx - s * 2.0, cy - s * 0.8, s * 1.1, s * 1.6), ICON)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(cx - s * 0.9, cy - s * 0.8),
+		Vector2(cx + s * 0.2, cy - s * 1.9),
+		Vector2(cx + s * 0.2, cy + s * 1.9),
+		Vector2(cx - s * 0.9, cy + s * 0.8),
+	]), ICON)
+
+	if muted:
+		var a := Vector2(cx + s * 0.9, cy - s * 1.0)
+		var b := Vector2(cx + s * 2.3, cy + s * 1.0)
+		draw_line(a, b, ICON, 2.5)
+		draw_line(Vector2(a.x, b.y), Vector2(b.x, a.y), ICON, 2.5)
+	else:
+		for i in 2:
+			draw_arc(
+				Vector2(cx + s * 0.2, cy), s * (1.1 + i * 0.8),
+				-PI * 0.33, PI * 0.33, 14, ICON, 2.2,
+			)

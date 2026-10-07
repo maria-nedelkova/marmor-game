@@ -111,7 +111,7 @@ func _layout() -> void:
 	if _title == null:
 		return
 	var w := size.x
-	var panel_height := 72.0
+	var panel_height := 96.0
 	# The trinkets hang ~8px below the panel's lower edge, so it cannot sit
 	# flush against the bottom of the screen or they are cut in half.
 	var panel_margin := 22.0

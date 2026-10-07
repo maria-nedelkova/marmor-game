@@ -7,7 +7,7 @@
 extends Control
 
 const MASCOT_SIZE := 76.0
-const BADGE_SIZE := Vector2(84.0, 38.0)
+const BADGE_SIZE := Vector2(108.0, 46.0)
 
 ## The bar's steps are TALLER than they are wide, as on the web — a row of
 ## narrow vertical bars rather than a few wide blocks. At 26 steps across the
@@ -103,7 +103,7 @@ func _draw_badge(box: Rect2, text: String, top: Color, bottom: Color, ink: Color
 			draw_rect(Rect2(box.position.x + inset, at_y, box.size.x - inset * 2.0, 1.0), tint)
 
 	var font := ThemeDB.fallback_font
-	var font_size := 19
+	var font_size := 25
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	draw_string(
 		font,

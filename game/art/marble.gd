@@ -32,6 +32,13 @@ static func draw_at(canvas: CanvasItem, centre: Vector2, radius: float, color_in
 	var base: Color = palette[color_index % palette.size()]
 	var offset := maxf(1.0, radius * 0.07)
 
+	# The web's `0 0 12px var(--glow)` — each marble lights the board in its own
+	# colour. Drawn as two faint discs rather than one, so the falloff has a
+	# shape instead of a visible edge. Kept dim: at full strength 81 of these
+	# turn the board into a lamp.
+	canvas.draw_circle(centre, radius * 1.55, Color(base.r, base.g, base.b, 0.10))
+	canvas.draw_circle(centre, radius * 1.25, Color(base.r, base.g, base.b, 0.14))
+
 	# Hard offset shadow, drawn first and never blurred — a soft shadow is what
 	# makes a pixel-art marble look like a sprite from a different game.
 	canvas.draw_circle(centre + Vector2(offset, offset), radius, SHADOW)
