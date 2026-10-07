@@ -129,9 +129,10 @@ func _layout() -> void:
 	_tool_bar.position = Vector2(10.0, rack_top)
 	_tool_bar.size = Vector2(w - 20.0, rack_height)
 
-	# A side margin so the board's neon frame is not clipped by the screen —
-	# the frame is drawn OUTSIDE the grid, so a board at full width loses it.
-	var side_margin := 14.0
+	# Full width: the board leaves half a cell clear either side itself (see
+	# board_view.cell_size), which is more room than the frame needs and keeps
+	# the clear space proportional to the board rather than a fixed 14px.
+	var side_margin := 0.0
 	var top := rack_top + rack_height + 12.0
 	var bottom := panel_height + panel_margin + 16.0
 	_board_view.position = Vector2(side_margin, top)

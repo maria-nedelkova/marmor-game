@@ -184,8 +184,20 @@ func _finish_current() -> void:
 # --- geometry ----------------------------------------------------------------
 
 
+## Side of one cell, sized so HALF A CELL of clear space is left either side of
+## the board.
+##
+## That margin is self-referential — it is half the cell, and the cell is what
+## is left after the margins — but it resolves exactly. Nine cells plus two
+## half-cells is ten cells across the width, so:
+##
+##   9 * cell + 2 * (cell / 2) = width   ->   cell = width / 10
+##
+## which makes the leftover `(width - 9 * cell) / 2` come out at precisely
+## cell / 2. Height is still divided by nine: the margin was asked for on the
+## left and right, and the board has the rack above it and the panel below.
 func cell_size() -> float:
-	return minf(size.x, size.y) / float(Rules.SIZE)
+	return minf(size.x / float(Rules.SIZE + 1), size.y / float(Rules.SIZE))
 
 
 ## Centred horizontally, pinned to the TOP of its box vertically.
