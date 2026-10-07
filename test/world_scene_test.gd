@@ -9,6 +9,16 @@ const WORLD_SCENE := preload("res://game/ui/world_scene.tscn")
 const MAIN := preload("res://game/ui/main.tscn")
 
 
+## Seeded per test. Without this the suite depends on whatever rng state the
+## previously-run suite left behind: these tests open real sessions, so the
+## opening deal — and therefore which cells are reachable — changes with it.
+## It passed alone and failed in a full run, which is the worst way for a
+## test to be wrong.
+func before_test() -> void:
+	MarmorEngine.rng = RandomNumberGenerator.new()
+	MarmorEngine.rng.seed = 97531
+
+
 func _world(index: int) -> Control:
 	var scene: Control = WORLD_SCENE.instantiate()
 	scene.world_index = index
@@ -221,4 +231,233 @@ func test_a_tool_with_no_charges_left_cannot_be_rearmed() -> void:
 	_rack_button(scene, Tools.HAMMER).pressed.emit()
 	assert_bool(scene.session.is_armed()).is_false()
 	assert_bool(_rack_button(scene, Tools.HAMMER).disabled).is_true()
+	scene.queue_free()
+
+
+# --- animation -------------------------------------------------------------
+
+
+## The display board lagging the session board is the entire mechanism. If it
+## ever stops lagging, the animation silently becomes a jump cut.
+func test_the_display_lags_the_session_until_playback_runs() -> void:
+	var scene := _world(0)
+	var view: Control = scene._board_view
+	var occupied: Array[Vector2i] = scene.session.board.occupied_cells()
+
+	var from: Vector2i = occupied[0]
+	var to := Vector2i(-1, -1)
+	for candidate in scene.session.board.empty_cells():
+		if not MarmorEngine.find_path(scene.session.board, from, candidate).is_empty():
+			to = candidate
+			break
+	assert_int(to.x).is_not_equal(-1)
+
+	scene.session.tap(from)
+	scene.session.tap(to)
+
+	# The session has already finished the turn...
+	assert_bool(scene.session.board.is_empty_at(from.x, from.y)).is_true()
+	# ...while the view has not started drawing it.
+	assert_bool(view.is_busy()).is_true()
+	assert_bool(view._display.is_empty_at(from.x, from.y)).is_false()
+
+	view.settle()
+	assert_bool(view.is_busy()).is_false()
+	assert_bool(view._display.is_empty_at(from.x, from.y)).is_true()
+	scene.queue_free()
+
+
+## After playback the two boards must agree exactly. A drift here would show as
+## marbles that are drawn but cannot be tapped, or the reverse.
+func test_settling_leaves_the_display_identical_to_the_session() -> void:
+	var scene := _world(0)
+	var view: Control = scene._board_view
+
+	for _turn in 6:
+		var occupied: Array[Vector2i] = scene.session.board.occupied_cells()
+		if occupied.is_empty():
+			break
+		var from: Vector2i = occupied[0]
+		var moved := false
+		for candidate in scene.session.board.empty_cells():
+			if not MarmorEngine.find_path(scene.session.board, from, candidate).is_empty():
+				scene.session.tap(from)
+				scene.session.tap(candidate)
+				moved = true
+				break
+		if not moved:
+			break
+		view.settle()
+
+		for r in Rules.SIZE:
+			for c in Rules.SIZE:
+				assert_int(view._display.at(r, c)) \
+					.override_failure_message("display and session differ at (%d,%d)" % [r, c]) \
+					.is_equal(scene.session.board.at(r, c))
+	scene.queue_free()
+
+
+## A tap during playback would be applied to a board the player cannot see yet.
+func test_taps_are_refused_while_the_board_is_playing_back() -> void:
+	var scene := _world(0)
+	var view: Control = scene._board_view
+	var occupied: Array[Vector2i] = scene.session.board.occupied_cells()
+
+	var from: Vector2i = occupied[0]
+	for candidate in scene.session.board.empty_cells():
+		if not MarmorEngine.find_path(scene.session.board, from, candidate).is_empty():
+			scene.session.tap(from)
+			scene.session.tap(candidate)
+			break
+	assert_bool(view.is_busy()).is_true()
+
+	var others: Array[Vector2i] = scene.session.board.occupied_cells()
+	scene._on_cell_tapped(others[0])
+	assert_bool(scene.session.has_selection()).is_false()
+
+	view.settle()
+	scene._on_cell_tapped(others[0])
+	assert_bool(scene.session.has_selection()).is_true()
+	scene.queue_free()
+
+
+## Leaving mid-turn must not strand the board part-way through a queue.
+func test_leaving_settles_the_board_first() -> void:
+	var scene := _world(0)
+	var view: Control = scene._board_view
+	var occupied: Array[Vector2i] = scene.session.board.occupied_cells()
+	for candidate in scene.session.board.empty_cells():
+		if not MarmorEngine.find_path(scene.session.board, occupied[0], candidate).is_empty():
+			scene.session.tap(occupied[0])
+			scene.session.tap(candidate)
+			break
+	assert_bool(view.is_busy()).is_true()
+
+	scene._title.pressed.emit()
+	assert_bool(view.is_busy()).is_false()
+	scene.queue_free()
+
+
+## A clear enqueues after the move that caused it, so the marble has to arrive
+## before the line goes. Out of order, a line would vanish before the marble
+## completing it was seen to land.
+func test_a_move_that_clears_queues_the_move_before_the_clear() -> void:
+	var scene := _world(0)
+	var view: Control = scene._board_view
+	var session: GameSession = scene.session
+	for p in session.board.occupied_cells():
+		session.board.clear_at(p.x, p.y)
+	view.set_session(session)
+
+	for c in [2, 3, 4, 5]:
+		session.board.set_at(4, c, 1)
+	session.board.set_at(0, 0, 1)
+
+	session.tap(Board.cell(0, 0))
+	session.tap(Board.cell(4, 6))
+
+	var kinds: Array[String] = []
+	for event in view._events:
+		kinds.append(event["type"])
+	assert_array(kinds).is_equal(["move", "clear"])
+	scene.queue_free()
+
+
+## The opening deal is adopted, not animated — there is nothing on an empty
+## board for a spawn animation to contrast against, and the player has not
+## acted yet.
+func test_the_opening_deal_is_not_animated() -> void:
+	var scene := _world(0)
+	assert_bool(scene._board_view.is_busy()).is_false()
+	assert_int(scene._board_view._display.marble_count()).is_equal(scene.session.board.marble_count())
+	scene.queue_free()
+
+
+## is_busy has to count the event currently playing, not just the ones still
+## queued. Tests never run frames, so _current is normally always empty and the
+## distinction never arises — but while the LAST event plays, _events is empty
+## and only _current says the board is still moving. Missing that would accept
+## taps during the final clear of a turn.
+##
+## _process is driven by hand here for that reason. Verified by mutation.
+func test_the_board_is_busy_while_the_last_event_is_still_playing() -> void:
+	var scene := _world(0)
+	var view: Control = scene._board_view
+	view.set_session(scene.session)
+
+	view.enqueue_clear([Board.cell(0, 0)] as Array[Vector2i])
+	assert_bool(view.is_busy()).is_true()
+
+	# Pulls the event out of the queue and into flight without finishing it.
+	view._process(0.001)
+	assert_array(view._events).is_empty()
+	assert_bool(view._current.is_empty()).is_false()
+	assert_bool(view.is_busy()) \
+		.override_failure_message("busy went false while an event was still in flight") \
+		.is_true()
+
+	# And taps are still refused at that point.
+	var occupied: Array[Vector2i] = scene.session.board.occupied_cells()
+	scene._on_cell_tapped(occupied[0])
+	assert_bool(scene.session.has_selection()).is_false()
+
+	# Running past the duration finishes it and releases the board.
+	view._process(1.0)
+	assert_bool(view.is_busy()).is_false()
+	scene.queue_free()
+
+
+## The glide itself: a marble part-way through a move must be drawn BETWEEN
+## cell centres, and must travel at a constant rate rather than speeding up or
+## stalling at corners.
+##
+## Asserted rather than eyeballed, because a screenshot of a glide is a poor
+## witness — at 0.45 of a ten-cell path the marble sits almost exactly on a
+## cell centre and the frame looks static whether the glide works or not.
+func test_a_gliding_marble_is_drawn_between_cells() -> void:
+	var scene := _world(0)
+	var view: Control = scene._board_view
+	view.size = Vector2(720, 900)
+
+	var path: Array[Vector2i] = []
+	for c in 9:
+		path.append(Board.cell(0, c))
+	view._current = {"type": "move", "path": path, "color": 1}
+
+	var start: Vector2 = view.cell_center(path[0])
+	var finish: Vector2 = view.cell_center(path[path.size() - 1])
+
+	assert_vector(view._moving_position(0.0)).is_equal_approx(start, Vector2(0.5, 0.5))
+	assert_vector(view._moving_position(1.0)).is_equal_approx(finish, Vector2(0.5, 0.5))
+
+	# Half way along must be half way across, and must not coincide with the
+	# cell centre it passes closest to by accident.
+	var middle: Vector2 = view._moving_position(0.5)
+	assert_vector(middle).is_equal_approx(start.lerp(finish, 0.5), Vector2(0.5, 0.5))
+
+	# Constant rate: equal steps in progress cover equal distance.
+	var previous: Vector2 = start
+	var first_step := 0.0
+	for i in range(1, 11):
+		var at: Vector2 = view._moving_position(i / 10.0)
+		var step := previous.distance_to(at)
+		if i == 1:
+			first_step = step
+		else:
+			assert_float(step) \
+				.override_failure_message("step %d was %f against a first step of %f" % [i, step, first_step]) \
+				.is_equal_approx(first_step, 0.5)
+		previous = at
+	scene.queue_free()
+
+
+## A one-cell move has no span to interpolate across, which is exactly where an
+## index-out-of-range or a divide-by-zero would live.
+func test_a_single_cell_path_does_not_break_the_glide() -> void:
+	var scene := _world(0)
+	var view: Control = scene._board_view
+	view.size = Vector2(720, 900)
+	view._current = {"type": "move", "path": [Board.cell(3, 3)] as Array[Vector2i], "color": 1}
+	assert_vector(view._moving_position(0.0)).is_equal(view.cell_center(Board.cell(3, 3)))
+	assert_vector(view._moving_position(1.0)).is_equal(view.cell_center(Board.cell(3, 3)))
 	scene.queue_free()

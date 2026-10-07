@@ -25,7 +25,7 @@ extends RefCounted
 
 signal marble_moved(path: Array[Vector2i], color: int)
 signal cells_cleared(cells: Array[Vector2i], points: int)
-signal marbles_spawned(cells: Array[Vector2i])
+signal marbles_spawned(cells: Array[Vector2i], colors: Array[int])
 signal queue_changed(colors: Array[int])
 signal score_changed(score: int)
 signal armed_changed(tool_id: String)
@@ -258,7 +258,10 @@ func _place(count: int, initial: bool) -> void:
 		board.set_at_cell(cells[i], colors[i])
 
 	if cells.size() > 0:
-		marbles_spawned.emit(cells)
+		var placed: Array[int] = []
+		for i in cells.size():
+			placed.append(colors[i])
+		marbles_spawned.emit(cells, placed)
 	if not initial:
 		_refill_queue()
 

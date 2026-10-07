@@ -30,6 +30,12 @@ func _ready() -> void:
 func start(index: int) -> void:
 	world_index = index
 	session = GameSession.new(index)
+	# Events are queued on the view rather than drawn immediately: the session
+	# resolves a whole turn in one call, so these all arrive before the first
+	# frame of animation. See board_view.gd on why it keeps its own board.
+	session.marble_moved.connect(_on_moved)
+	session.cells_cleared.connect(_on_cleared)
+	session.marbles_spawned.connect(_on_spawned)
 	session.score_changed.connect(_refresh)
 	session.queue_changed.connect(func(_colors: Array[int]) -> void: _refresh())
 	session.armed_changed.connect(func(_id: String) -> void: _refresh())
@@ -51,7 +57,10 @@ func _build() -> void:
 	_title.add_theme_color_override("font_color", Color(1.0, 0.78, 0.95))
 	_title.add_theme_font_size_override("font_size", 26)
 	_title.tooltip_text = "Back to the map"
-	_title.pressed.connect(func() -> void: exit_requested.emit())
+	_title.pressed.connect(func() -> void:
+		if _board_view != null:
+			_board_view.settle()
+		exit_requested.emit())
 	add_child(_title)
 
 	_score_label = _make_label(Color(0.92, 0.95, 1.0), 18)
@@ -65,6 +74,7 @@ func _build() -> void:
 	_board_view.set_script(BoardViewScript)
 	_board_view.mouse_filter = Control.MOUSE_FILTER_STOP
 	_board_view.cell_tapped.connect(_on_cell_tapped)
+	_board_view.animation_finished.connect(_refresh)
 	add_child(_board_view)
 
 	_tool_bar = HBoxContainer.new()
@@ -169,7 +179,24 @@ func _on_tool_pressed(tool_id: String) -> void:
 		_refresh()
 
 
+func _on_moved(path: Array[Vector2i], color: int) -> void:
+	_board_view.enqueue_move(path, color)
+
+
+func _on_cleared(cells: Array[Vector2i], _points: int) -> void:
+	_board_view.enqueue_clear(cells)
+
+
+func _on_spawned(cells: Array[Vector2i], colors: Array[int]) -> void:
+	_board_view.enqueue_spawn(cells, colors)
+
+
+## Taps are refused while the board is still playing back. The session has
+## already resolved the turn, so a tap during the animation would be applied to
+## a board the player cannot see yet — legal, and baffling.
 func _on_cell_tapped(cell: Vector2i) -> void:
+	if _board_view.is_busy():
+		return
 	if session.tap(cell) != "none":
 		_refresh()
 

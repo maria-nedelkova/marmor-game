@@ -1,15 +1,30 @@
 ## Draws a GameSession's board and turns taps into cell coordinates.
 ##
-## Deliberately thin. It owns no rules — every tap goes to `session.tap()` and
-## every rule lives there, which is what lets the whole game be tested without
-## a scene. If a rule ever starts creeping in here, that is the bug.
+## Deliberately thin on rules: every tap goes to `session.tap()` and every rule
+## lives there. If a rule ever starts creeping in here, that is the bug.
+##
+## ## Why there is a second board in here
+##
+## `GameSession` resolves a whole turn synchronously — the move, any clear, the
+## spawn, and any clear that causes — and emits a signal at each step. By the
+## time the view hears the first one, `session.board` is already in its final
+## state, so drawing from it would skip straight to the end.
+##
+## So the view keeps `_display`, its own copy, and a queue of the events the
+## session reported. Playback applies them one at a time. The alternative was
+## making the session await the view between steps, which would have put
+## animation timing inside the game rules and made every one of its tests
+## need a scene.
 ##
 ## Marbles are drawn rather than sprited for now. The web version's hand-drawn
 ## pixel art has not been ported, and a flat disc with a highlight is an honest
-## placeholder — it reads correctly and does not pretend to be the final look.
+## placeholder — it reads correctly without pretending to be the final look.
 extends Control
 
 signal cell_tapped(cell: Vector2i)
+## Emitted when the queue drains, so the host can re-enable input and refresh
+## anything that was waiting for the board to settle.
+signal animation_finished
 
 ## The eight marble colours, matched to the web version's --c0..--c7.
 const MARBLE_COLORS: Array[Color] = [
@@ -25,30 +40,127 @@ const MARBLE_COLORS: Array[Color] = [
 
 const GRID_LINE := Color(0.62, 0.38, 0.86, 0.55)
 const BOARD_BG := Color(0.07, 0.05, 0.14)
+const ARMED_TINT := Color(0.98, 0.72, 0.42)
+
+## Seconds per cell travelled. Short, because a marble crossing the board can
+## cover sixteen cells and a per-cell cost that feels right over three becomes
+## a wait over sixteen.
+const MOVE_PER_CELL := 0.035
+## Floor on a move, so a one-cell nudge still registers as movement.
+const MOVE_MIN := 0.12
+const CLEAR_TIME := 0.26
+const SPAWN_TIME := 0.18
 
 var session: GameSession
+
+## What is drawn. Lags `session.board` by however much of the queue is unplayed.
+var _display: Board
+var _events: Array[Dictionary] = []
+var _current: Dictionary = {}
+var _elapsed: float = 0.0
 
 
 func _ready() -> void:
 	resized.connect(queue_redraw)
+	set_process(true)
 
 
 func set_session(new_session: GameSession) -> void:
 	session = new_session
+	# The opening deal happens in the session's constructor, before anything is
+	# connected, so it is adopted rather than animated — there is nothing for a
+	# spawn animation to contrast against on an empty board anyway.
+	_display = session.board.duplicate_board()
+	_events.clear()
+	_current = {}
 	queue_redraw()
 
 
-## Side of one cell. The board is square and centred, so it is bounded by the
-## shorter axis — a board that overflowed the screen on a narrow phone would be
-## unplayable in exactly the places that matter most.
+func is_busy() -> bool:
+	return not _current.is_empty() or not _events.is_empty()
+
+
+func enqueue_move(path: Array[Vector2i], color: int) -> void:
+	_events.append({"type": "move", "path": path, "color": color})
+
+
+func enqueue_clear(cells: Array[Vector2i]) -> void:
+	_events.append({"type": "clear", "cells": cells})
+
+
+func enqueue_spawn(cells: Array[Vector2i], colors: Array[int]) -> void:
+	_events.append({"type": "spawn", "cells": cells, "colors": colors})
+
+
+## Applies every queued event at once and stops animating. Used when the board
+## must be correct immediately — leaving a world mid-turn, or a test that cares
+## about the end state rather than the journey.
+func settle() -> void:
+	while not _current.is_empty() or not _events.is_empty():
+		if _current.is_empty():
+			_current = _events.pop_front()
+			_elapsed = 0.0
+		_finish_current()
+	if session != null:
+		_display = session.board.duplicate_board()
+	queue_redraw()
+
+
+func _process(delta: float) -> void:
+	if _current.is_empty():
+		if _events.is_empty():
+			return
+		_current = _events.pop_front()
+		_elapsed = 0.0
+
+	_elapsed += delta
+	if _elapsed >= _duration(_current):
+		_finish_current()
+		if _current.is_empty() and _events.is_empty():
+			animation_finished.emit()
+	queue_redraw()
+
+
+func _duration(event: Dictionary) -> float:
+	match event["type"]:
+		"move":
+			return maxf(MOVE_MIN, (event["path"] as Array).size() * MOVE_PER_CELL)
+		"clear":
+			return CLEAR_TIME
+		_:
+			return SPAWN_TIME
+
+
+## Commits an event to the display board. Separated from _process so `settle`
+## can run the same transitions without waiting for them.
+func _finish_current() -> void:
+	match _current["type"]:
+		"move":
+			var path: Array[Vector2i] = _current["path"]
+			_display.clear_at(path[0].x, path[0].y)
+			_display.set_at_cell(path[path.size() - 1], _current["color"])
+		"clear":
+			for p in (_current["cells"] as Array[Vector2i]):
+				_display.clear_at(p.x, p.y)
+		"spawn":
+			var cells: Array[Vector2i] = _current["cells"]
+			var colors: Array[int] = _current["colors"]
+			for i in cells.size():
+				_display.set_at_cell(cells[i], colors[i])
+	_current = {}
+	_elapsed = 0.0
+
+
+# --- geometry ----------------------------------------------------------------
+
+
 func cell_size() -> float:
 	return minf(size.x, size.y) / float(Rules.SIZE)
 
 
-## The board is centred horizontally but sits high in its vertical slack
-## rather than dead centre. Centred, a 9x9 square inside a tall phone area left
-## a large empty band above the grid and pushed the board down toward the
-## thumb rail. A quarter of the slack reads as "attached to the HUD above it".
+## Centred horizontally, but high in its vertical slack rather than dead
+## centre. Centred, a 9x9 square inside a tall phone area left a wide empty
+## band above the grid and pushed the board toward the thumb rail.
 func board_origin() -> Vector2:
 	var side := cell_size() * Rules.SIZE
 	var slack := size - Vector2(side, side)
@@ -74,7 +186,7 @@ func cell_center(cell: Vector2i) -> Vector2:
 
 
 func _gui_input(event: InputEvent) -> void:
-	# Mouse and touch both, so this works on a desktop editor run and on a
+	# Mouse and touch both, so this works in a desktop editor run and on a
 	# phone without a second code path.
 	var pressed_at := Vector2.INF
 	if event is InputEventMouseButton:
@@ -95,8 +207,11 @@ func _gui_input(event: InputEvent) -> void:
 	cell_tapped.emit(cell)
 
 
+# --- drawing -----------------------------------------------------------------
+
+
 func _draw() -> void:
-	if session == null:
+	if session == null or _display == null:
 		return
 	var s := cell_size()
 	var origin := board_origin()
@@ -111,26 +226,71 @@ func _draw() -> void:
 		draw_line(at_h, at_h + Vector2(side, 0.0), GRID_LINE, 1.0)
 
 	# Selection ring under the marble, so the marble stays fully legible.
-	if session.has_selection():
+	if session.has_selection() and not is_busy():
 		draw_circle(cell_center(session.selected), s * 0.46, Color(1.0, 1.0, 1.0, 0.18))
 
-	# The flask's first pick, in the prompt's own colour so the board and the
-	# line of text asking for a second marble read as one instruction.
+	# The flask's first pick, in the prompt's colour so the board and the line
+	# of text asking for a second marble read as one instruction.
 	if session.swap_first.x != -1:
-		draw_arc(cell_center(session.swap_first), s * 0.46, 0.0, TAU, 40, Color(0.98, 0.72, 0.42), 3.0)
+		draw_arc(cell_center(session.swap_first), s * 0.46, 0.0, TAU, 40, ARMED_TINT, 3.0)
+
+	var clearing := {}
+	var progress := 0.0
+	if not _current.is_empty():
+		progress = clampf(_elapsed / maxf(0.001, _duration(_current)), 0.0, 1.0)
+		if _current["type"] == "clear":
+			for p in (_current["cells"] as Array[Vector2i]):
+				clearing[p] = true
+
+	var spawning := {}
+	if not _current.is_empty() and _current["type"] == "spawn":
+		for p in (_current["cells"] as Array[Vector2i]):
+			spawning[p] = true
+
+	var moving_from := Vector2i(-1, -1)
+	if not _current.is_empty() and _current["type"] == "move":
+		moving_from = (_current["path"] as Array[Vector2i])[0]
+
+	for r in Rules.SIZE:
+		for c in Rules.SIZE:
+			var cell := Board.cell(r, c)
+			var color_index := _display.at(r, c)
+			if color_index == Board.EMPTY:
+				continue
+			# The travelling marble is drawn separately, at its interpolated
+			# position, not in the cell it started from.
+			if cell == moving_from:
+				continue
+
+			var radius := s * 0.38
+			if clearing.has(cell):
+				# Swell slightly, then collapse — a straight shrink reads as the
+				# marble falling through the board rather than being destroyed.
+				radius *= (1.0 + 0.25 * sin(progress * PI)) * (1.0 - progress)
+			elif spawning.has(cell):
+				radius *= progress
+			if radius > 0.3:
+				_draw_marble(cell_center(cell), radius, color_index)
+
+	if moving_from.x != -1:
+		_draw_marble(_moving_position(progress), s * 0.38, _current["color"])
 
 	# An armed tool tints the whole grid, so there is no way to be holding the
 	# hammer without noticing. A rack button alone is too easy to lose track of
 	# when the board is where you are looking.
 	if session.is_armed():
-		draw_rect(Rect2(origin, Vector2(side, side)), Color(0.98, 0.72, 0.42, 0.06))
+		draw_rect(Rect2(origin, Vector2(side, side)), Color(ARMED_TINT.r, ARMED_TINT.g, ARMED_TINT.b, 0.06))
 
-	for r in Rules.SIZE:
-		for c in Rules.SIZE:
-			var color_index := session.board.at(r, c)
-			if color_index == Board.EMPTY:
-				continue
-			_draw_marble(cell_center(Board.cell(r, c)), s * 0.38, color_index)
+
+## Walks the path at constant speed, so a marble turning a corner does not
+## speed up or stall — the glide should read as one continuous travel.
+func _moving_position(progress: float) -> Vector2:
+	var path: Array[Vector2i] = _current["path"]
+	if path.size() == 1:
+		return cell_center(path[0])
+	var span := float(path.size() - 1) * clampf(progress, 0.0, 1.0)
+	var index := mini(int(floor(span)), path.size() - 2)
+	return cell_center(path[index]).lerp(cell_center(path[index + 1]), span - index)
 
 
 func _draw_marble(centre: Vector2, radius: float, color_index: int) -> void:
