@@ -116,9 +116,15 @@ var _elapsed: float = 0.0
 ## selection or the board does.
 var _reachable: Array[Vector2i] = []
 var _reachable_for := Vector2i(-2, -2)
-## Shared by every dot, and reset whenever the selection changes, so they all
-## blink together. The web has to force-restart each dot's animation to get
-## this; one clock gets it for free.
+## Shared by every dot, so they blink together, and RESET when the selection
+## changes so the cycle always opens on the bright state.
+##
+## Both halves matter. The web gets the first from force-restarting every dot's
+## animation together; one clock gets it for free. The second it gets from
+## `0%, 49% { opacity: 1 }` — the keyframes start lit. A free-running clock
+## here meant a new selection picked up at whatever phase it happened to be in,
+## so the dots opened dim about half the time and the first thing the player
+## saw was them disappearing.
 var _blink := 0.0
 ## The sky behind the grid.
 ##
@@ -279,6 +285,8 @@ func _refresh_reachable() -> void:
 		return
 	_reachable_for = key
 	_reachable = MarmorEngine.reachable_from(_display, session.selected)
+	# Restart the cycle, so a new selection always opens on the bright state.
+	_blink = 0.0
 
 
 ## The square a cell occupies, for anything that lights the cell rather than

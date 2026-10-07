@@ -46,9 +46,19 @@ const PAD_X := 30.0
 const PAD_Y := 14.0
 const MIN_WIDTH := 210.0
 
-const LEVEL_SIZE_MAX := 23
-const NAME_SIZE_MAX := 34
-const NAME_SIZE_MIN := 19
+## LEVEL N leads and the world's name sits under it, smaller.
+##
+## Which line is bigger is a judgement about what the screen is for: the level
+## number is where you are in the run, the name is which place that is. The
+## number is also short and fixed-length, so it can be large without ever
+## threatening the plaque's width — the NAME is what has to flex, and giving
+## the flexible line the smaller size is what makes the whole thing fit on a
+## phone with a 22-character world name.
+const LEVEL_SIZE_MAX := 38
+const LEVEL_SIZE_MIN := 22
+## The name's size as a fraction of the level's.
+const NAME_RATIO := 0.62
+const NAME_SIZE_MIN := 14
 
 const FILL := Color(0.043, 0.035, 0.125)
 ## The border's gradient, cyan into pink, running top to bottom — the same
@@ -74,8 +84,8 @@ var level_text := ""
 var name_text := ""
 
 var _plaque: Rect2
-var _name_size := NAME_SIZE_MAX
 var _level_size := LEVEL_SIZE_MAX
+var _name_size := int(round(LEVEL_SIZE_MAX * NAME_RATIO))
 
 
 func set_lines(level: String, world_name: String) -> void:
@@ -110,14 +120,17 @@ func _measure() -> void:
 	# edge by that much or they are clipped.
 	var available := size.x - (POINT + 10.0) * 2.0
 
-	_name_size = NAME_SIZE_MAX
-	while _name_size > NAME_SIZE_MIN:
-		var w := font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, _name_size).x
+	# The LEVEL line is sized first and the name follows it down, because the
+	# name is the one that can be long: shrinking the pair until the name fits
+	# is the only ordering that cannot overflow.
+	_level_size = LEVEL_SIZE_MAX
+	while _level_size > LEVEL_SIZE_MIN:
+		var candidate := maxi(NAME_SIZE_MIN, int(round(_level_size * NAME_RATIO)))
+		var w := font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, candidate).x
 		if w + PAD_X * 2.0 <= available:
 			break
-		_name_size -= 1
-	# The level line scales with the name so the two never look unrelated.
-	_level_size = maxi(16, int(round(_name_size * 0.68)))
+		_level_size -= 1
+	_name_size = maxi(NAME_SIZE_MIN, int(round(_level_size * NAME_RATIO)))
 
 	var name_w := font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, _name_size).x
 	var level_w := font.get_string_size(level_text, HORIZONTAL_ALIGNMENT_LEFT, -1, _level_size).x
