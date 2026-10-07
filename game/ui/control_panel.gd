@@ -250,17 +250,32 @@ func _draw_key_frame(box: Rect2) -> void:
 			draw_rect(Rect2(box.position.x + inset, at_y, box.size.x - inset * 2.0, 1.0), tint)
 
 
-## Three bars. The reference's left key is a hamburger; this one restarts
-## rather than opening a menu, but the shape is the one the panel is built
-## around and a different glyph here would unbalance the two ends.
+## A circular arrow — the icon for the thing this key actually does.
+##
+## The reference's left key is a hamburger, and this was one too for a while
+## because the panel's composition is built around that shape. But it restarts
+## the world rather than opening a menu, and a hamburger that does not open a
+## menu is a lie told in the one place a player looks when they are lost. The
+## shape is close enough in weight that the two ends still balance.
 func _draw_restart_icon(box: Rect2) -> void:
-	var w := box.size.x * 0.42
-	var cx := box.position.x + box.size.x * 0.5
-	var cy := box.position.y + box.size.y * 0.5
-	for i in 3:
-		var y := cy + (i - 1) * 7.0
-		draw_rect(Rect2(cx - w * 0.5, y - 1.5, w, 3.0), ICON)
+	var centre := box.position + box.size * 0.5
+	var radius := box.size.x * 0.25
 
+	# An almost-closed circle: the gap is what makes it read as an arrow going
+	# round rather than as a ring.
+	var start := -PI * 0.32
+	draw_arc(centre, radius, start, start + TAU * 0.82, 32, ICON, 3.0)
+
+	# The head sits at the open end, pointing back the way the arc came, so the
+	# eye follows it around rather than off the icon.
+	var at := centre + Vector2(cos(start), sin(start)) * radius
+	var along := Vector2(sin(start), -cos(start))
+	var across := Vector2(-along.y, along.x)
+	draw_colored_polygon(PackedVector2Array([
+		at + along * 7.0,
+		at + across * 5.0 - along * 2.0,
+		at - across * 5.0 - along * 2.0,
+	]), ICON)
 
 ## A speaker cone with two arcs, or with a cross when muted — the state has to
 ## be visible without tapping it to find out.
