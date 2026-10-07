@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://bmarmorkingcap1"]
+
+[ext_resource type="Script" path="res://dev/kings_capture.gd" id="1_kc"]
+
+[node name="KingsCapture" type="Node"]
+script = ExtResource("1_kc")
