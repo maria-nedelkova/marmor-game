@@ -1,24 +1,26 @@
-## Playing one world: the board, the score against the King's target, the
-## queue, the tool rack, and what happens when the attempt ends.
+## Playing one world.
 ##
-## Holds a GameSession and renders it. The session owns every rule; this owns
-## only presentation and the two outward edges — recording a win to
-## PlayerProgress, and going back to the map.
+## Laid out the way the web version lays out a phone: the game's name, then the
+## duel row (Pretender, progress bar, King), then the board, then the control
+## panel pinned under it. The session owns every rule; this owns presentation
+## and the two outward edges — recording a win, and going back to the map.
 extends Control
 
 signal exit_requested
 
 const BoardViewScript := preload("res://game/ui/board_view.gd")
+const DuelHeaderScript := preload("res://game/ui/duel_header.gd")
+const ControlPanelScript := preload("res://game/ui/control_panel.gd")
 
 var session: GameSession
 var world_index: int = 0
 
 var _board_view: Control
+var _duel: Control
+var _panel: Control
 var _title: Button
-var _score_label: Label
-var _queue_label: Label
-var _status_label: Label
 var _prompt_label: Label
+var _status_label: Label
 var _tool_bar: HBoxContainer
 
 
@@ -30,9 +32,6 @@ func _ready() -> void:
 func start(index: int) -> void:
 	world_index = index
 	session = GameSession.new(index)
-	# Events are queued on the view rather than drawn immediately: the session
-	# resolves a whole turn in one call, so these all arrive before the first
-	# frame of animation. See board_view.gd on why it keeps its own board.
 	session.marble_moved.connect(_on_moved)
 	session.cells_cleared.connect(_on_cleared)
 	session.marbles_spawned.connect(_on_spawned)
@@ -40,22 +39,25 @@ func start(index: int) -> void:
 	session.queue_changed.connect(func(_colors: Array[int]) -> void: _refresh())
 	session.armed_changed.connect(func(_id: String) -> void: _refresh())
 	session.finished.connect(_on_finished)
+
 	if _board_view != null:
 		_board_view.set_session(session)
+		_duel.set_session(session)
+		_panel.set_session(session)
+	if _status_label != null:
+		_status_label.text = ""
 	_refresh()
 
 
 func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	# The game name is the way back to the map — the same affordance as on the
-	# web version, where tapping the title returns you there.
+	# "LEVEL 1 — NEONIA-1". Also the way back to the map, as on the web.
 	_title = Button.new()
-	_title.text = "MARMOR"
 	_title.flat = true
 	_title.focus_mode = Control.FOCUS_NONE
 	_title.add_theme_color_override("font_color", Color(1.85, 1.12, 1.7))
-	_title.add_theme_font_size_override("font_size", 26)
+	_title.add_theme_font_size_override("font_size", 22)
 	_title.tooltip_text = "Back to the map"
 	_title.pressed.connect(func() -> void:
 		if _board_view != null:
@@ -63,12 +65,10 @@ func _build() -> void:
 		exit_requested.emit())
 	add_child(_title)
 
-	_score_label = _make_label(Color(1.3, 1.36, 1.5), 18)
-	_queue_label = _make_label(Color(0.88, 1.0, 1.25), 14)
-	_status_label = _make_label(Color(1.9, 1.5, 0.85), 20)
-	# Reserved whether or not a tool is armed, so arming one does not shove the
-	# board up a line.
-	_prompt_label = _make_label(Color(1.45, 1.02, 0.58), 14)
+	_duel = Control.new()
+	_duel.set_script(DuelHeaderScript)
+	_duel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_duel)
 
 	_board_view = Control.new()
 	_board_view.set_script(BoardViewScript)
@@ -80,6 +80,14 @@ func _build() -> void:
 	_tool_bar = HBoxContainer.new()
 	_tool_bar.add_theme_constant_override("separation", 6)
 	add_child(_tool_bar)
+
+	_prompt_label = _make_label(Color(1.45, 1.02, 0.58), 13)
+	_status_label = _make_label(Color(1.9, 1.5, 0.85), 20)
+
+	_panel = Control.new()
+	_panel.set_script(ControlPanelScript)
+	_panel.restart_pressed.connect(_on_restart)
+	add_child(_panel)
 
 	resized.connect(_layout)
 	_layout()
@@ -96,46 +104,58 @@ func _make_label(color: Color, font_size: int) -> Label:
 
 
 func _layout() -> void:
+	if _title == null:
+		return
 	var w := size.x
-	_title.position = Vector2(0.0, 8.0)
-	_title.size = Vector2(w, 34.0)
-	_score_label.position = Vector2(0.0, 46.0)
-	_score_label.size = Vector2(w, 24.0)
-	_queue_label.position = Vector2(0.0, 72.0)
-	_queue_label.size = Vector2(w, 20.0)
-	_prompt_label.position = Vector2(0.0, size.y - 92.0)
+	var panel_height := 72.0
+	# The trinkets hang ~8px below the panel's lower edge, so it cannot sit
+	# flush against the bottom of the screen or they are cut in half.
+	var panel_margin := 22.0
+	var rack_height := 42.0
+
+	_title.position = Vector2(0.0, 6.0)
+	_title.size = Vector2(w, 30.0)
+
+	_duel.position = Vector2(0.0, 38.0)
+	_duel.size = Vector2(w, 80.0)
+
+	# Tools sit ABOVE the board, matching the web version's phone layout: name,
+	# duellists and progress, tools, board, controls pinned to the bottom.
+	_tool_bar.position = Vector2(10.0, 122.0)
+	_tool_bar.size = Vector2(w - 20.0, rack_height)
+
+	# A side margin so the board's neon frame is not clipped by the screen —
+	# the frame is drawn OUTSIDE the grid, so a board at full width loses it.
+	var side_margin := 14.0
+	var top := 122.0 + rack_height + 14.0
+	var bottom := panel_height + panel_margin + 16.0
+	_board_view.position = Vector2(side_margin, top)
+	_board_view.size = Vector2(w - side_margin * 2.0, maxf(0.0, size.y - top - bottom))
+
+	# Under the board, not above it. Above, it landed on the board's own frame
+	# — and the space under the board was empty anyway, which is where a line
+	# telling the player what the board wants should be.
+	var board_side := _board_view.size.x
+	_prompt_label.position = Vector2(0.0, top + board_side + 18.0)
 	_prompt_label.size = Vector2(w, 20.0)
 
-	# The board takes the square middle; the rack sits under it.
-	var top := 100.0
-	var rack_height := 54.0
-	var available := Vector2(w, maxf(0.0, size.y - top - rack_height - 16.0))
-	_board_view.position = Vector2(0.0, top)
-	_board_view.size = available
+	_panel.position = Vector2(12.0, size.y - panel_height - panel_margin)
+	_panel.size = Vector2(w - 24.0, panel_height)
 
-	_status_label.position = Vector2(0.0, top + available.y * 0.5 - 12.0)
+	_status_label.position = Vector2(0.0, top + _board_view.size.y * 0.5 - 12.0)
 	_status_label.size = Vector2(w, 24.0)
-
-	_tool_bar.position = Vector2(12.0, size.y - rack_height - 8.0)
-	_tool_bar.size = Vector2(w - 24.0, rack_height)
 
 
 func _refresh() -> void:
 	if session == null:
 		return
-	var world := session.world
-	_score_label.text = "%s     %d / %d" % [world["name"], session.score, session.target()]
-
-	var names: Array[String] = []
-	for color in session.next_queue:
-		names.append(str(color))
-	_queue_label.text = "next up:  %s" % ", ".join(names)
-
+	_title.text = "LEVEL %d  —  %s" % [session.world_index + 1, session.world["name"]]
 	_prompt_label.text = session.prompt()
-	queue_redraw()
 	_rebuild_tools()
 	if _board_view != null:
 		_board_view.queue_redraw()
+		_duel.queue_redraw()
+		_panel.queue_redraw()
 
 
 ## Rebuilt rather than updated in place: charges change on nearly every action,
@@ -144,8 +164,7 @@ func _rebuild_tools() -> void:
 	# remove_child BEFORE queue_free. queue_free is deferred to the end of the
 	# frame, so freeing alone leaves the old buttons attached while the new ones
 	# are added — a doubled rack for a frame, and anything reading the rack in
-	# between (a test, or a second refresh in the same frame) sees stale
-	# buttons with stale charges on them.
+	# between sees stale buttons with stale charges.
 	for child in _tool_bar.get_children():
 		_tool_bar.remove_child(child)
 		child.queue_free()
@@ -161,8 +180,36 @@ func _rebuild_tools() -> void:
 		button.toggle_mode = true
 		button.button_pressed = session.armed_tool == id
 		button.tooltip_text = tool_def["description"]
+		button.add_theme_font_size_override("font_size", 11)
+		_style_key(button, session.armed_tool == id)
 		button.pressed.connect(_on_tool_pressed.bind(id))
 		_tool_bar.add_child(button)
+
+
+## The rack's neon key look, applied to every state a Button has. Godot falls
+## back to its default grey theme for any state left unset, so a key that looks
+## right at rest turns into a stock button the moment it is hovered or held —
+## all five have to be given, not just `normal`.
+func _style_key(button: Button, armed: bool) -> void:
+	var edge := Color(1.6, 0.55, 1.15) if armed else Color(0.45, 1.5, 1.65)
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		var box := StyleBoxFlat.new()
+		box.bg_color = Color(0.06, 0.08, 0.19, 0.92)
+		box.set_border_width_all(2)
+		box.border_color = edge
+		box.set_corner_radius_all(7)
+		box.content_margin_left = 8.0
+		box.content_margin_right = 8.0
+		if state == "pressed" or state == "hover":
+			box.bg_color = Color(0.12, 0.14, 0.30, 0.95)
+		if state == "disabled":
+			box.border_color = Color(0.30, 0.32, 0.44)
+			box.bg_color = Color(0.05, 0.05, 0.11, 0.85)
+		button.add_theme_stylebox_override(state, box)
+	button.add_theme_color_override("font_color", Color(1.25, 1.35, 1.5))
+	button.add_theme_color_override("font_disabled_color", Color(0.42, 0.44, 0.56))
+	button.add_theme_color_override("font_hover_color", Color(1.5, 1.55, 1.7))
+	button.add_theme_color_override("font_pressed_color", Color(1.5, 1.55, 1.7))
 
 
 ## Targeted tools arm and wait for a board tap; the rest fire immediately.
@@ -180,6 +227,14 @@ func _on_tool_pressed(tool_id: String) -> void:
 		_refresh()
 
 
+## A fresh attempt at the same world. Settles first so a restart mid-animation
+## does not leave the old board's queue playing into the new session.
+func _on_restart() -> void:
+	if _board_view != null:
+		_board_view.settle()
+	start(world_index)
+
+
 func _on_moved(path: Array[Vector2i], color: int) -> void:
 	_board_view.enqueue_move(path, color)
 
@@ -193,8 +248,8 @@ func _on_spawned(cells: Array[Vector2i], colors: Array[int]) -> void:
 
 
 ## Taps are refused while the board is still playing back. The session has
-## already resolved the turn, so a tap during the animation would be applied to
-## a board the player cannot see yet — legal, and baffling.
+## already resolved the turn, so a tap mid-animation would be applied to a
+## board the player cannot see yet — legal, and baffling.
 func _on_cell_tapped(cell: Vector2i) -> void:
 	if _board_view.is_busy():
 		return
@@ -216,18 +271,3 @@ func _on_finished(won: bool) -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.075, 0.058, 0.155))
-	if session == null:
-		return
-
-	# The king you are actually fighting, beside the score he set. "Each world
-	# is a new king" is the premise, and it only lands if he is on screen while
-	# you play rather than only on the map you picked him from.
-	var texture := Kings.texture_for(session.world["id"])
-	if texture == null:
-		return
-	var box := Rect2(Vector2(size.x * 0.5 + 118.0, 38.0), Vector2(48.0, 48.0))
-	var tint := Color.WHITE
-	if session.phase == GameSession.Phase.WON:
-		# Dethroned: drained of colour, so the header reflects the outcome.
-		tint = Color(0.45, 0.45, 0.52, 0.8)
-	PixelSprite.draw_scaled(self, texture, box, tint)

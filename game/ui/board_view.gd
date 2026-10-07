@@ -26,22 +26,32 @@ signal cell_tapped(cell: Vector2i)
 ## anything that was waiting for the board to settle.
 signal animation_finished
 
-## The eight marble colours, matched to the web version's --c0..--c7.
-const MARBLE_COLORS: Array[Color] = [
-	Color(0.91, 0.26, 0.33),  # red
-	Color(0.36, 0.60, 0.98),  # blue
-	Color(0.36, 0.84, 0.47),  # green
-	Color(0.96, 0.82, 0.26),  # yellow
-	Color(0.72, 0.42, 0.95),  # purple
-	Color(0.98, 0.56, 0.24),  # orange
-	Color(0.36, 0.86, 0.88),  # cyan
-	Color(0.96, 0.44, 0.74),  # pink
-]
 
-## Just over the glow threshold, so the grid reads as lit tubing rather than
-## as drawn lines. See level_map.gd's HDR_GAIN note on why these sit barely
-## above 1.0 instead of well above it.
-const GRID_LINE := Color(1.05, 0.62, 1.35, 0.6)
+## The grid's radial gradient, carried over from the web version's
+## `.board { background: radial-gradient(circle, #ec6fc0 0%, #ab63d4 42%,
+## #7268cf 100%) }`.
+##
+## There, the board's background paints THROUGH the 3px gaps between cells —
+## the gap is the grid line, so one gradient colours the whole grid at once.
+## Here the lines are drawn, so the gradient is sampled per segment by
+## distance from the board's centre. Same result, and the reason the stops
+## are 0 / 0.42 / 1 rather than evenly spaced: pink holds the middle where
+## the play is, and the fall to violet happens over the outer half.
+const GRID_CENTRE := Color(1.00, 0.36, 0.78)   # #ec6fc0, pushed
+const GRID_MID := Color(0.671, 0.388, 0.831)     # #ab63d4
+const GRID_EDGE := Color(0.40, 0.32, 0.92)     # #7268cf, pushed
+const GRID_MID_STOP := 0.55
+## The grid is lit, so it crosses the bloom threshold. Low, per HIGHLIGHT_GAIN.
+const GRID_GAIN := 1.35
+
+## The board's neon frame: a near-white core with pink either side, which is
+## what the web version's `border: 1px solid #fff2fb` plus its stacked pink
+## box-shadows add up to. The glow itself is the WorldEnvironment's job now
+## rather than four shadow layers.
+const FRAME_CORE := Color(2.0, 1.85, 1.95)       # #fff2fb, driven hot
+const FRAME_EDGE := Color(1.85, 0.42, 1.05)      # #ff52c8, driven hot
+const FRAME_THICKNESS := 4.0
+
 const BOARD_BG := Color(0.10, 0.07, 0.19)
 ## Multiplier for a marble's specular highlight. The highlight is the only part
 ## of a marble that blooms — pushing the whole disc over the threshold turns 81
@@ -174,13 +184,16 @@ func cell_size() -> float:
 	return minf(size.x, size.y) / float(Rules.SIZE)
 
 
-## Centred horizontally, but high in its vertical slack rather than dead
-## centre. Centred, a 9x9 square inside a tall phone area left a wide empty
-## band above the grid and pushed the board toward the thumb rail.
+## Centred horizontally, pinned to the TOP of its box vertically.
+##
+## The host gives this a box as tall as whatever is left on the screen, and a
+## 9x9 square is bounded by the width, so centring it in that box left the
+## board floating with a wide empty band above it. Pinned to the top it sits
+## directly under the duel row, and all the slack collects below where the rack
+## and the control panel are.
 func board_origin() -> Vector2:
 	var side := cell_size() * Rules.SIZE
-	var slack := size - Vector2(side, side)
-	return Vector2(slack.x * 0.5, maxf(0.0, slack.y) * 0.25)
+	return Vector2((size.x - side) * 0.5, 0.0)
 
 
 func cell_at(point: Vector2) -> Vector2i:
@@ -234,12 +247,8 @@ func _draw() -> void:
 	var side := s * Rules.SIZE
 
 	draw_rect(Rect2(origin, Vector2(side, side)), BOARD_BG)
-
-	for i in range(Rules.SIZE + 1):
-		var at := origin + Vector2(i * s, 0.0)
-		draw_line(at, at + Vector2(0.0, side), GRID_LINE, 1.0)
-		var at_h := origin + Vector2(0.0, i * s)
-		draw_line(at_h, at_h + Vector2(side, 0.0), GRID_LINE, 1.0)
+	_draw_grid(origin, s, side)
+	_draw_frame(origin, side)
 
 	# Selection ring under the marble, so the marble stays fully legible.
 	if session.has_selection() and not is_busy():
@@ -298,6 +307,47 @@ func _draw() -> void:
 		draw_rect(Rect2(origin, Vector2(side, side)), Color(ARMED_WASH.r, ARMED_WASH.g, ARMED_WASH.b, 0.05))
 
 
+## Samples the radial gradient at a point, by its distance from the board's
+## centre as a fraction of the half-diagonal.
+func _grid_color_at(point: Vector2, origin: Vector2, side: float) -> Color:
+	var centre := origin + Vector2(side, side) * 0.5
+	var t := clampf(point.distance_to(centre) / (side * 0.70710678), 0.0, 1.0)
+	var base: Color
+	if t <= GRID_MID_STOP:
+		base = GRID_CENTRE.lerp(GRID_MID, t / GRID_MID_STOP)
+	else:
+		base = GRID_MID.lerp(GRID_EDGE, (t - GRID_MID_STOP) / (1.0 - GRID_MID_STOP))
+	return Color(base.r * GRID_GAIN, base.g * GRID_GAIN, base.b * GRID_GAIN)
+
+
+## Each line is drawn as short segments so the gradient runs ALONG it, not just
+## across the grid. A single line per row would have to pick one colour, and
+## the horizontal lines near the middle would then be flat pink end to end
+## while the gradient only showed between rows.
+func _draw_grid(origin: Vector2, s: float, side: float) -> void:
+	var steps := Rules.SIZE * 2
+	var step := side / float(steps)
+	for i in range(Rules.SIZE + 1):
+		for j in steps:
+			var from_v := origin + Vector2(i * s, j * step)
+			var to_v := from_v + Vector2(0.0, step)
+			draw_line(from_v, to_v, _grid_color_at((from_v + to_v) * 0.5, origin, side), 2.0)
+
+			var from_h := origin + Vector2(j * step, i * s)
+			var to_h := from_h + Vector2(step, 0.0)
+			draw_line(from_h, to_h, _grid_color_at((from_h + to_h) * 0.5, origin, side), 2.0)
+
+
+## White core between two pink lines. The order matters: pink is laid down
+## first and the white drawn inside it, so the core stays the brightest thing
+## and the bloom reads as light escaping a tube rather than a pink smear.
+func _draw_frame(origin: Vector2, side: float) -> void:
+	var outer := Rect2(origin, Vector2(side, side)).grow(FRAME_THICKNESS)
+	draw_rect(outer, FRAME_EDGE, false, FRAME_THICKNESS)
+	draw_rect(Rect2(origin, Vector2(side, side)).grow(1.0), FRAME_CORE, false, 2.0)
+	draw_rect(Rect2(origin, Vector2(side, side)), FRAME_EDGE, false, 1.5)
+
+
 ## Walks the path at constant speed, so a marble turning a corner does not
 ## speed up or stall — the glide should read as one continuous travel.
 func _moving_position(progress: float) -> Vector2:
@@ -310,7 +360,7 @@ func _moving_position(progress: float) -> Vector2:
 
 
 func _draw_marble(centre: Vector2, radius: float, color_index: int) -> void:
-	var base: Color = MARBLE_COLORS[color_index % MARBLE_COLORS.size()]
+	var base: Color = BoardPalette.MARBLE_COLORS[color_index % BoardPalette.MARBLE_COLORS.size()]
 	draw_circle(centre, radius, base.darkened(0.45))
 	draw_circle(centre, radius * 0.88, base)
 	var lit := base.lightened(0.45)
