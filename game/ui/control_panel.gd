@@ -28,6 +28,10 @@ const CORNER_RADIUS := 14.0
 ## the same reason the queue is: the panel takes the board's width, so the
 ## board's cell is panel width / 9.
 const KEY_OVERSIZE := 1.12
+## Clear space inside the frame, on every side. One constant rather than four,
+## because the whole point is that the gap above a key matches the gap beside
+## it — two numbers drift the moment either is tuned.
+const PADDING := 20.0
 ## Queue marbles are drawn at the BOARD's marble size, not a fixed one. The
 ## panel is set to the board's width, so the board's cell is panel width / 9 —
 ## which means the queue can match the board without being told the board's
@@ -77,21 +81,21 @@ func set_session(new_session: GameSession) -> void:
 
 func key_size() -> float:
 	var cell := size.x / float(Rules.SIZE)
-	return minf(size.y - 16.0, cell * KEY_OVERSIZE)
+	return minf(size.y - PADDING * 2.0, cell * KEY_OVERSIZE)
 
 
 func _layout() -> void:
 	if _restart == null:
 		return
 	var key := key_size()
-	# The same gap left and right as above and below, so a key sits in a square
-	# of clear space rather than being pushed toward the ends.
-	var inset := (size.y - key) * 0.5
+	# The same gap on all four sides, so a key sits in a square of clear space
+	# rather than being pushed toward the ends of the panel.
+	var inset := maxf(PADDING, (size.y - key) * 0.5)
 	for button in [_restart, _sound]:
 		button.custom_minimum_size = Vector2(key, key)
 		button.size = Vector2(key, key)
-	_restart.position = Vector2(inset, inset)
-	_sound.position = Vector2(size.x - key - inset, inset)
+	_restart.position = Vector2(inset, (size.y - key) * 0.5)
+	_sound.position = Vector2(size.x - key - inset, (size.y - key) * 0.5)
 	queue_redraw()
 
 
@@ -147,7 +151,9 @@ func _draw_queue() -> void:
 	if colors.is_empty():
 		return
 	var cell := size.x / float(Rules.SIZE)
-	var diameter := cell * QUEUE_SCALE
+	# Bounded by the padding as well as by the cell, so a short panel shrinks the
+	# marbles rather than letting them touch the top and bottom borders.
+	var diameter := minf(cell * QUEUE_SCALE, size.y - PADDING * 2.0)
 	# Wide enough that three marbles read as three, not as a run.
 	var gap := 22.0
 	var total := colors.size() * diameter + (colors.size() - 1) * gap
@@ -167,7 +173,7 @@ func _draw_marble(centre: Vector2, radius: float, color_index: int) -> void:
 ## on crossing diagonals reads as decoration someone placed.
 func _draw_ornaments() -> void:
 	var key := key_size()
-	var inset := (size.y - key) * 0.5
+	var inset := maxf(PADDING, (size.y - key) * 0.5)
 	# The two bands between a key and the queue. Everything is placed INTO one
 	# of these rather than scattered across the panel and then discarded for
 	# landing in the middle — that version threw away more than half of them,
