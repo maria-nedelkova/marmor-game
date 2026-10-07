@@ -80,6 +80,9 @@ func _build() -> void:
 
 	_tool_bar = HBoxContainer.new()
 	_tool_bar.add_theme_constant_override("separation", 6)
+	# Centred in the board's width. Left-aligned, a world with two tools left a
+	# lopsided stub under a full-width board.
+	_tool_bar.alignment = BoxContainer.ALIGNMENT_CENTER
 	add_child(_tool_bar)
 
 	_prompt_label = _make_label(Color(1.45, 1.02, 0.58), 13)
@@ -124,11 +127,9 @@ func _layout() -> void:
 
 	# Tools sit ABOVE the board, matching the web version's phone layout: name,
 	# duellists and progress, tools, board, controls pinned to the bottom.
-	var rack_top := 6.0 + plaque_height + 2.0 + duel_height + 8.0
-	# Positioned after the board so it can share the board's edges; the board
-	# block below sets no geometry the rack depends on.
-	_tool_bar.position = Vector2(10.0, rack_top)
-	_tool_bar.size = Vector2(w - 20.0, rack_height)
+	# Only the Y is known here — the rack takes its width and left edge from the
+	# board, which is sized below, so it is positioned after that.
+	var rack_top := duel_top + duel_height + 8.0
 
 	# Full width: the board leaves half a cell clear either side itself (see
 	# board_view.cell_size), which is more room than the frame needs and keeps
@@ -148,6 +149,9 @@ func _layout() -> void:
 	var board_side := board_cell * Rules.SIZE
 	var board_origin: Vector2 = _board_view.board_origin()
 	var board_left := _board_view.position.x + board_origin.x
+
+	_tool_bar.position = Vector2(board_left, rack_top)
+	_tool_bar.size = Vector2(board_side, rack_height)
 
 	_duel.position = Vector2(board_left, duel_top)
 	_duel.size = Vector2(board_side, duel_height)
