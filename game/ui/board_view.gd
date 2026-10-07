@@ -70,6 +70,17 @@ const HIGHLIGHT_GAIN := 1.18
 ## with --mr-accent #29f1ff. The CELL is lit, not the marble — a ring behind
 ## the marble reads as a halo the marble owns, where a filled cell reads as the
 ## square being picked, which is what a move actually selects.
+## The reachable dots, from the web's `.cell.reachable::after`: an 8px square
+## of --mr-accent in a 54px cell, blinking on a 1.1s cycle.
+##
+## `steps(2, jump-none)` in the CSS is load-bearing — it snaps between two
+## opacities rather than fading, which is what makes the dots read as pixel art
+## blinking rather than as something breathing. Lerping here would look wrong
+## in a way that is hard to name afterwards.
+const DOT_SCALE := 8.0 / 54.0
+const DOT_PERIOD := 1.1
+const DOT_BRIGHT := Color(0.21, 1.42, 1.50, 1.0)
+const DOT_DIM := Color(0.21, 1.42, 1.50, 0.25)
 const SELECTED_FILL := Color(0.094, 0.125, 0.333)
 const SELECTED_EDGE := Color(0.21, 1.42, 1.50)
 const ARMED_TINT := Color(1.45, 1.02, 0.58)
@@ -95,6 +106,15 @@ var _display: Board
 var _events: Array[Dictionary] = []
 var _current: Dictionary = {}
 var _elapsed: float = 0.0
+## Reachable cells, cached against the selection that produced them — a flood
+## fill on every frame would be wasteful, and the answer only changes when the
+## selection or the board does.
+var _reachable: Array[Vector2i] = []
+var _reachable_for := Vector2i(-2, -2)
+## Shared by every dot, and reset whenever the selection changes, so they all
+## blink together. The web has to force-restart each dot's animation to get
+## this; one clock gets it for free.
+var _blink := 0.0
 
 
 func _ready() -> void:
@@ -144,8 +164,12 @@ func settle() -> void:
 
 
 func _process(delta: float) -> void:
+	_blink += delta
 	if _current.is_empty():
 		if _events.is_empty():
+			# Still redraw while idle: the reachable dots blink.
+			if session != null and session.has_selection():
+				queue_redraw()
 			return
 		_current = _events.pop_front()
 		_elapsed = 0.0
@@ -232,6 +256,17 @@ func cell_at(point: Vector2) -> Vector2i:
 	return Board.cell(r, c)
 
 
+## Recomputes the reachable set only when the selection moves. The board can
+## also change under a standing selection — a tool can clear a wall — so the
+## marble count is part of the key.
+func _refresh_reachable() -> void:
+	var key := Vector2i(session.selected.x, session.selected.y + _display.marble_count() * 100)
+	if key == _reachable_for:
+		return
+	_reachable_for = key
+	_reachable = MarmorEngine.reachable_from(_display, session.selected)
+
+
 ## The square a cell occupies, for anything that lights the cell rather than
 ## what is standing on it.
 func cell_rect(cell: Vector2i) -> Rect2:
@@ -280,8 +315,15 @@ func _draw() -> void:
 	_draw_grid(origin, s, side)
 	_draw_frame(origin, side)
 
-	# The selected CELL, filled and edged — not a ring around the marble.
+	# The selected CELL, filled and edged — not a ring around the marble — and
+	# a dot in every cell it can legally reach.
 	if session.has_selection() and not is_busy():
+		_refresh_reachable()
+		var dot := maxf(3.0, s * DOT_SCALE)
+		var tint := DOT_BRIGHT if fmod(_blink, DOT_PERIOD) < DOT_PERIOD * 0.5 else DOT_DIM
+		for p in _reachable:
+			draw_rect(Rect2(cell_center(p) - Vector2(dot, dot) * 0.5, Vector2(dot, dot)), tint)
+
 		var box := cell_rect(session.selected)
 		draw_rect(box, SELECTED_FILL)
 		draw_rect(box, SELECTED_EDGE, false, 3.0)
