@@ -68,16 +68,22 @@ const BOARD_BG := Color(0.10, 0.07, 0.19)
 ## the marble reads as a halo the marble owns, where a filled cell reads as the
 ## square being picked, which is what a move actually selects.
 ## The reachable dots, from the web's `.cell.reachable::after`: an 8px square
-## of --mr-accent in a 54px cell, blinking on a 1.1s cycle.
+## of --mr-accent (#29f1ff) in a 54px cell, blinking on a 1.1s cycle between
+## full opacity and 0.25.
 ##
-## `steps(2, jump-none)` in the CSS is load-bearing — it snaps between two
+## `steps(2, jump-none)` in the CSS is load-bearing — it snaps between the two
 ## opacities rather than fading, which is what makes the dots read as pixel art
-## blinking rather than as something breathing. Lerping here would look wrong
-## in a way that is hard to name afterwards.
+## blinking rather than as something breathing.
+##
+## The colour is the literal #29f1ff, deliberately BELOW the bloom threshold.
+## It was HDR-boosted before, which meant both states glowed: the bright one
+## bled into the cell around it and the dim one never actually looked dim,
+## because bloom was filling in what the dropped opacity took away. Unlit, the
+## two states are as far apart as the web's are.
 const DOT_SCALE := 8.0 / 54.0
 const DOT_PERIOD := 1.1
-const DOT_BRIGHT := Color(0.21, 1.42, 1.50, 1.0)
-const DOT_DIM := Color(0.21, 1.42, 1.50, 0.25)
+const DOT_BRIGHT := Color(0.161, 0.945, 1.0, 1.0)
+const DOT_DIM := Color(0.161, 0.945, 1.0, 0.25)
 const SELECTED_FILL := Color(0.094, 0.125, 0.333)
 const SELECTED_EDGE := Color(0.21, 1.42, 1.50)
 const ARMED_TINT := Color(1.45, 1.02, 0.58)
