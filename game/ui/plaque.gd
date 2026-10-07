@@ -56,11 +56,19 @@ const FILL := Color(0.043, 0.035, 0.125)
 ## on the screen is edged the same way.
 const EDGE_TOP := Color(0.45, 1.55, 1.85)
 const EDGE_BOTTOM := Color(1.85, 0.48, 1.20)
-## The reference's title pink, used for both lines.
-## Light pink, as in the reference — closer to rose than to magenta. The darker
-## magenta read as a different colour from the title it was copied from.
-const INK := Color(2.00, 1.32, 1.85)
-const INK_LEVEL := Color(1.92, 1.45, 1.86)
+## The reference's title colour, used for both lines.
+##
+## It is a LILAC, not a pink: blue sits above red in those letters, which is
+## what gives them their violet cast. Earlier passes read it as magenta and
+## then as rose, and both were wrong in the same way — too warm, because they
+## had red leading. Getting the channel order right matters more here than the
+## exact brightness.
+## Kept just over the threshold rather than well past it. The channel RATIO is
+## what carries the hue; the level only decides how much it blooms — and past
+## about 1.5 the bloom whitens the letters until the lilac is gone and they
+## read as plain white text with a coloured halo.
+const INK := Color(1.24, 0.90, 1.38)
+const INK_LEVEL := Color(1.18, 0.92, 1.33)
 
 var level_text := ""
 var name_text := ""
