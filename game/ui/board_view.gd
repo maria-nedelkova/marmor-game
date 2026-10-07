@@ -27,22 +27,19 @@ signal cell_tapped(cell: Vector2i)
 signal animation_finished
 
 
-## The grid's radial gradient, carried over from the web version's
-## `.board { background: radial-gradient(circle, #ec6fc0 0%, #ab63d4 42%,
-## #7268cf 100%) }`.
+## The grid's gradient, read off the reference: VERTICAL, violet across the top
+## rows falling to pink lower down.
 ##
-## There, the board's background paints THROUGH the 3px gaps between cells —
-## the gap is the grid line, so one gradient colours the whole grid at once.
-## Here the lines are drawn, so the gradient is sampled per segment by
-## distance from the board's centre. Same result, and the reason the stops
-## are 0 / 0.42 / 1 rather than evenly spaced: pink holds the middle where
-## the play is, and the fall to violet happens over the outer half.
-const GRID_CENTRE := Color(1.00, 0.36, 0.78)   # #ec6fc0, pushed
-const GRID_MID := Color(0.671, 0.388, 0.831)     # #ab63d4
-const GRID_EDGE := Color(0.40, 0.32, 0.92)     # #7268cf, pushed
-const GRID_MID_STOP := 0.55
+## It was radial — pink in the middle out to violet at the edges, which is what
+## the web stylesheet does with `radial-gradient(circle, ...)`. The reference
+## image is not that, and the difference is visible: a radial gradient makes
+## the four corners the darkest thing on the board and leaves the middle rows
+## flat, where a vertical one gives every row its own colour and keeps the
+## corners as bright as the edges beside them.
+const GRID_TOP := Color(0.42, 0.38, 0.95)      # violet
+const GRID_BOTTOM := Color(1.00, 0.36, 0.78)   # magenta
 ## The grid is lit, so it crosses the bloom threshold. Low, per HIGHLIGHT_GAIN.
-const GRID_GAIN := 1.35
+const GRID_GAIN := 1.25
 
 ## The board's neon frame: a near-white core with pink either side, which is
 ## what the web version's `border: 1px solid #fff2fb` plus its stacked pink
@@ -307,16 +304,10 @@ func _draw() -> void:
 		draw_rect(Rect2(origin, Vector2(side, side)), Color(ARMED_WASH.r, ARMED_WASH.g, ARMED_WASH.b, 0.05))
 
 
-## Samples the radial gradient at a point, by its distance from the board's
-## centre as a fraction of the half-diagonal.
+## Samples the gradient at a point, by how far down the board it sits.
 func _grid_color_at(point: Vector2, origin: Vector2, side: float) -> Color:
-	var centre := origin + Vector2(side, side) * 0.5
-	var t := clampf(point.distance_to(centre) / (side * 0.70710678), 0.0, 1.0)
-	var base: Color
-	if t <= GRID_MID_STOP:
-		base = GRID_CENTRE.lerp(GRID_MID, t / GRID_MID_STOP)
-	else:
-		base = GRID_MID.lerp(GRID_EDGE, (t - GRID_MID_STOP) / (1.0 - GRID_MID_STOP))
+	var t := clampf((point.y - origin.y) / maxf(1.0, side), 0.0, 1.0)
+	var base := GRID_TOP.lerp(GRID_BOTTOM, t)
 	return Color(base.r * GRID_GAIN, base.g * GRID_GAIN, base.b * GRID_GAIN)
 
 

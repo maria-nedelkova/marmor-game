@@ -6,7 +6,7 @@
 ## advances on the King — it reads as chasing him down.
 extends Control
 
-const MASCOT_SIZE := 56.0
+const MASCOT_SIZE := 76.0
 const BADGE_SIZE := Vector2(84.0, 38.0)
 
 ## The bar's steps are TALLER than they are wide, as on the web — a row of
@@ -14,7 +14,7 @@ const BADGE_SIZE := Vector2(84.0, 38.0)
 ## track each one is a slim tick, which is what makes a small score visible at
 ## all: two lit ticks read as "started", where two wide blocks would read as a
 ## quarter full.
-const BAR_STEPS := 26
+const BAR_STEPS := 22
 const BAR_HEIGHT := 26.0
 const BAR_GAP := 2.0
 
@@ -70,7 +70,9 @@ func _draw() -> void:
 		)
 
 	# The bar runs between the mascots, level with their heads.
-	var left := MASCOT_SIZE + 24.0
+	# Clear of the mascots by a wide margin: they are the thing worth looking
+	# at here, and the bar was eating the room they need.
+	var left := MASCOT_SIZE + 34.0
 	_draw_bar(Rect2(
 		Vector2(left, mascot_y + MASCOT_SIZE * 0.5 - BAR_HEIGHT * 0.5),
 		Vector2(maxf(0.0, size.x - left * 2.0), BAR_HEIGHT),

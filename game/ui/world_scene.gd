@@ -118,9 +118,8 @@ func _layout() -> void:
 	_title.position = Vector2(0.0, 6.0)
 	_title.size = Vector2(w, plaque_height)
 
-	# Tall enough for a badge stacked over a mascot: 38 + 56 plus the gaps.
-	# At 80 the badges overlapped the title and the bar landed on the rack.
-	var duel_height := 108.0
+	# Tall enough for a badge stacked over a mascot: 38 + 76 plus the gaps.
+	var duel_height := 128.0
 	_duel.position = Vector2(0.0, 6.0 + plaque_height + 2.0)
 	_duel.size = Vector2(w, duel_height)
 
