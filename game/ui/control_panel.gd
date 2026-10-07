@@ -218,7 +218,11 @@ func _queue_width() -> float:
 ##
 ## Seeded, so the arrangement is the same every launch: decoration that moves
 ## between redraws is noise.
-const ORNAMENT_COLS := 3
+## A 2x2 grid per band: eight ornaments where there were twelve. Twelve filled
+## every slot and the bands read as busy rather than decorated — and with three
+## columns the outer two sat hard against the key and the queue. Four per side
+## leaves each one room, and an even grid keeps the two bands matched.
+const ORNAMENT_COLS := 2
 const ORNAMENT_ROWS := 2
 
 func _seed_ornaments() -> void:

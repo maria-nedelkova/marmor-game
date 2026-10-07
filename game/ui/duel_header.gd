@@ -107,13 +107,12 @@ func _draw_badge(box: Rect2, text: String, top: Color, bottom: Color, ink: Color
 		if y < thickness or y >= rows - thickness:
 			draw_rect(Rect2(box.position.x + inset, at_y, box.size.x - inset * 2.0, 1.0), tint)
 
-	var font := ThemeDB.fallback_font
-	var font_size := 25
-	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-	draw_string(
-		font,
-		box.position + Vector2((box.size.x - width) * 0.5, box.size.y * 0.5 + font_size * 0.36),
-		text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, ink,
+	var scale := 3.0
+	PixelFont.draw_centered(
+		self, text,
+		box.position.x + box.size.x * 0.5,
+		box.position.y + (box.size.y - PixelFont.height(scale)) * 0.5,
+		scale, ink,
 	)
 
 

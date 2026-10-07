@@ -54,11 +54,15 @@ const MIN_WIDTH := 210.0
 ## threatening the plaque's width — the NAME is what has to flex, and giving
 ## the flexible line the smaller size is what makes the whole thing fit on a
 ## phone with a 22-character world name.
-const LEVEL_SIZE_MAX := 38
-const LEVEL_SIZE_MIN := 22
-## The name's size as a fraction of the level's.
-const NAME_RATIO := 0.62
-const NAME_SIZE_MIN := 14
+## Sizes are now pixel SCALES — how many screen pixels one font pixel covers —
+## rather than point sizes. Whole numbers only: at a fractional scale some
+## glyph pixels cover two screen pixels and their neighbours cover one, and the
+## letters come out visibly uneven, which is the one thing pixel art cannot
+## afford.
+const LEVEL_SCALE_MAX := 5
+const LEVEL_SCALE_MIN := 3
+const NAME_SCALE_MAX := 3
+const NAME_SCALE_MIN := 2
 
 const FILL := Color(0.043, 0.035, 0.125)
 ## The border's gradient, cyan into pink, running top to bottom — the same
@@ -84,8 +88,8 @@ var level_text := ""
 var name_text := ""
 
 var _plaque: Rect2
-var _level_size := LEVEL_SIZE_MAX
-var _name_size := int(round(LEVEL_SIZE_MAX * NAME_RATIO))
+var _level_size := LEVEL_SCALE_MAX
+var _name_size := NAME_SCALE_MAX
 
 
 func set_lines(level: String, world_name: String) -> void:
@@ -115,7 +119,6 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _measure() -> void:
-	var font := ThemeDB.fallback_font
 	# The points stick out past the body, so the body has to stop short of the
 	# edge by that much or they are clipped.
 	var available := size.x - (POINT + 10.0) * 2.0
@@ -123,19 +126,18 @@ func _measure() -> void:
 	# The LEVEL line is sized first and the name follows it down, because the
 	# name is the one that can be long: shrinking the pair until the name fits
 	# is the only ordering that cannot overflow.
-	_level_size = LEVEL_SIZE_MAX
-	while _level_size > LEVEL_SIZE_MIN:
-		var candidate := maxi(NAME_SIZE_MIN, int(round(_level_size * NAME_RATIO)))
-		var w := font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, candidate).x
-		if w + PAD_X * 2.0 <= available:
+	_level_size = LEVEL_SCALE_MAX
+	_name_size = NAME_SCALE_MAX
+	while _name_size > NAME_SCALE_MIN:
+		if PixelFont.measure(name_text, _name_size) + PAD_X * 2.0 <= available:
 			break
-		_level_size -= 1
-	_name_size = maxi(NAME_SIZE_MIN, int(round(_level_size * NAME_RATIO)))
+		_name_size -= 1
+		_level_size = maxi(LEVEL_SCALE_MIN, _level_size - 1)
 
-	var name_w := font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, _name_size).x
-	var level_w := font.get_string_size(level_text, HORIZONTAL_ALIGNMENT_LEFT, -1, _level_size).x
+	var name_w := PixelFont.measure(name_text, _name_size)
+	var level_w := PixelFont.measure(level_text, _level_size)
 	var width := clampf(maxf(name_w, level_w) + PAD_X * 2.0, MIN_WIDTH, available)
-	var height := float(_level_size + _name_size) + PAD_Y * 2.0 + 8.0
+	var height := PixelFont.height(_level_size) + PixelFont.height(_name_size) + PAD_Y * 2.0 + 8.0
 	_plaque = Rect2(Vector2((size.x - width) * 0.5, 2.0), Vector2(width, height))
 
 
@@ -209,21 +211,15 @@ func _draw() -> void:
 	draw_colored_polygon(outline, FILL)
 	_draw_gradient_edge(outline)
 
-	var font := ThemeDB.fallback_font
-	var level_w := font.get_string_size(level_text, HORIZONTAL_ALIGNMENT_LEFT, -1, _level_size).x
-	var name_w := font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, _name_size).x
 	var cx := _plaque.position.x + _plaque.size.x * 0.5
-
-	draw_string(
-		font, Vector2(cx - level_w * 0.5, _plaque.position.y + PAD_Y + _level_size),
-		level_text, HORIZONTAL_ALIGNMENT_LEFT, -1, _level_size, INK_LEVEL,
-	)
-	draw_string(
-		font, Vector2(cx - name_w * 0.5, _plaque.position.y + PAD_Y + _level_size + _name_size + 6.0),
-		name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, _name_size, INK,
+	var level_h := PixelFont.height(_level_size)
+	PixelFont.draw_centered(self, level_text, cx, _plaque.position.y + PAD_Y, _level_size, INK_LEVEL)
+	PixelFont.draw_centered(
+		self, name_text, cx, _plaque.position.y + PAD_Y + level_h + 8.0, _name_size, INK,
 	)
 
 	_draw_specks()
+
 
 
 ## The border, segment by segment, tinted by how far down the segment sits.
