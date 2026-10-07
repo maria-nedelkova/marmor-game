@@ -59,7 +59,7 @@ const MIN_WIDTH := 210.0
 ## glyph pixels cover two screen pixels and their neighbours cover one, and the
 ## letters come out visibly uneven, which is the one thing pixel art cannot
 ## afford.
-const LEVEL_SCALE_MAX := 5
+const LEVEL_SCALE_MAX := 4
 const LEVEL_SCALE_MIN := 3
 const NAME_SCALE_MAX := 3
 const NAME_SCALE_MIN := 2

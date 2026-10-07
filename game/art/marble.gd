@@ -28,7 +28,13 @@ const HIGHLIGHT := Color(1.08, 1.08, 1.10, 0.82)
 
 ## `radius` is the marble's outer radius. The web sizes a marble at 74% of its
 ## cell, so a caller working from a cell should pass cell_size * 0.37.
-static func draw_at(canvas: CanvasItem, centre: Vector2, radius: float, color_index: int) -> void:
+## `glow` scales the halo. The board draws at 1.0; somewhere crowded — the
+## control panel's queue, three marbles in a narrow strip — wants far less,
+## because two neighbouring halos overlap into what looks like a second ring
+## around each marble.
+static func draw_at(
+	canvas: CanvasItem, centre: Vector2, radius: float, color_index: int, glow: float = 1.0
+) -> void:
 	if radius <= 0.5:
 		return
 	var palette: Array = BoardPalette.MARBLE_COLORS
@@ -43,8 +49,9 @@ static func draw_at(canvas: CanvasItem, centre: Vector2, radius: float, color_in
 	# a halo that looks right on a single marble adds up to a lit board; what
 	# reads correctly here is the suggestion of a glow rather than one you would
 	# pick out if you looked at one marble alone.
-	canvas.draw_circle(centre, radius * 1.55, Color(base.r, base.g, base.b, 0.045))
-	canvas.draw_circle(centre, radius * 1.25, Color(base.r, base.g, base.b, 0.065))
+	if glow > 0.0:
+		canvas.draw_circle(centre, radius * 1.55, Color(base.r, base.g, base.b, 0.045 * glow))
+		canvas.draw_circle(centre, radius * 1.25, Color(base.r, base.g, base.b, 0.065 * glow))
 
 	# Hard offset shadow, drawn first and never blurred — a soft shadow is what
 	# makes a pixel-art marble look like a sprite from a different game.

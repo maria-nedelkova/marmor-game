@@ -163,7 +163,9 @@ func _draw_queue() -> void:
 
 
 func _draw_marble(centre: Vector2, radius: float, color_index: int) -> void:
-	Marble.draw_at(self, centre, radius, color_index)
+	# A third of the board's halo. These sit shoulder to shoulder in a narrow
+	# strip, where overlapping halos read as a second ring around each marble.
+	Marble.draw_at(self, centre, radius, color_index, 0.3)
 
 
 ## The four inner corners: sparkles on one diagonal, hearts on the other.

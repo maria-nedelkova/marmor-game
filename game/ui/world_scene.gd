@@ -13,6 +13,16 @@ const DuelHeaderScript := preload("res://game/ui/duel_header.gd")
 const ControlPanelScript := preload("res://game/ui/control_panel.gd")
 const PlaqueScript := preload("res://game/ui/plaque.gd")
 
+## Wide enough for the longest short name at scale 2 — CRYSTAL is seven
+## characters — plus padding. Six of these have to fit the board's width.
+const RACK_KEY_WIDTH := 100.0
+const RACK_TEXT_SCALE := 2.0
+
+
+## Two lines of text plus padding — the tool's name over its charge count.
+func _rack_height() -> float:
+	return PixelFont.height(RACK_TEXT_SCALE) * 2.0 + 18.0
+
 var session: GameSession
 var world_index: int = 0
 
@@ -20,9 +30,9 @@ var _board_view: Control
 var _duel: Control
 var _panel: Control
 var _title: Control
-var _prompt_label: Label
+var _prompt := ""
 var _status_label: Label
-var _tool_bar: HBoxContainer
+var _tool_bar: Control
 var _stars: Array[Dictionary] = []
 
 
@@ -82,14 +92,15 @@ func _build() -> void:
 	_board_view.animation_finished.connect(_refresh)
 	add_child(_board_view)
 
-	_tool_bar = HBoxContainer.new()
-	_tool_bar.add_theme_constant_override("separation", 6)
-	# Centred in the board's width. Left-aligned, a world with two tools left a
-	# lopsided stub under a full-width board.
-	_tool_bar.alignment = BoxContainer.ALIGNMENT_CENTER
+	# A plain Control, not an HBoxContainer. The keys are drawn by _draw from
+	# their Buttons' positions, and a container does not assign those until it
+	# next sorts its children — so on the frame the rack was rebuilt every
+	# button still reported position zero and all six drew on top of each
+	# other. Laying them out here means the positions are true immediately.
+	_tool_bar = Control.new()
+	_tool_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_tool_bar)
 
-	_prompt_label = _make_label(Color(1.45, 1.02, 0.58), 13)
 	_status_label = _make_label(Color(1.9, 1.5, 0.85), 20)
 
 	_panel = Control.new()
@@ -119,7 +130,7 @@ func _layout() -> void:
 	# The trinkets hang ~8px below the panel's lower edge, so it cannot sit
 	# flush against the bottom of the screen or they are cut in half.
 	var panel_margin := 22.0
-	var rack_height := 42.0
+	var rack_height := _rack_height()
 
 	var plaque_height := 112.0
 	# Clear space above the plaque, so it is not jammed against the top edge.
@@ -159,6 +170,7 @@ func _layout() -> void:
 
 	_tool_bar.position = Vector2(board_left, rack_top)
 	_tool_bar.size = Vector2(board_side, rack_height)
+	_layout_rack()
 
 	_duel.position = Vector2(board_left, duel_top)
 	_duel.size = Vector2(board_side, duel_height)
@@ -169,8 +181,6 @@ func _layout() -> void:
 	# Under the board, not above it. Above, it landed on the board's own frame
 	# — and the space under the board was empty anyway, which is where a line
 	# telling the player what the board wants should be.
-	_prompt_label.position = Vector2(0.0, top + board_side + 18.0)
-	_prompt_label.size = Vector2(w, 20.0)
 
 	_status_label.position = Vector2(0.0, top + _board_view.size.y * 0.5 - 12.0)
 	_status_label.size = Vector2(w, 24.0)
@@ -180,12 +190,79 @@ func _refresh() -> void:
 	if session == null:
 		return
 	_title.set_lines("LEVEL %d" % (session.world_index + 1), session.world["name"])
-	_prompt_label.text = session.prompt()
+	_prompt = session.prompt()
+	queue_redraw()
 	_rebuild_tools()
 	if _board_view != null:
 		_board_view.queue_redraw()
 		_duel.queue_redraw()
 		_panel.queue_redraw()
+
+
+## Spreads the keys evenly across the rack's width, centred.
+##
+## Worlds unlock tools one at a time, so the count runs from zero to six: the
+## keys shrink to fit rather than overflowing once there are six, and centring
+## keeps one or two from sitting as a lopsided stub under a full-width board.
+func _layout_rack() -> void:
+	var keys := _tool_bar.get_child_count()
+	if keys == 0:
+		return
+	var gap := 8.0
+	var width := minf(RACK_KEY_WIDTH, (_tool_bar.size.x - gap * (keys - 1)) / float(keys))
+	var total := keys * width + gap * (keys - 1)
+	var x := (_tool_bar.size.x - total) * 0.5
+	for i in keys:
+		var button := _tool_bar.get_child(i) as Control
+		button.size = Vector2(width, _rack_height())
+		button.position = Vector2(x + i * (width + gap), 0.0)
+
+
+## The rack's keys: a neon frame with the tool's name over its charge count.
+##
+## Drawn here rather than themed onto the Buttons, because a Button renders its
+## label with a Font and the whole point is that this screen's text is
+## PixelFont. The Buttons underneath are invisible and exist only to be tapped.
+func _draw_rack() -> void:
+	if session == null:
+		return
+	for child in _tool_bar.get_children():
+		var button := child as Button
+		if button == null or not button.has_meta("tool_id"):
+			continue
+		var id: String = button.get_meta("tool_id")
+		var box := Rect2(_tool_bar.position + button.position, button.size)
+		var armed := session.armed_tool == id
+		var usable := session.can_use(id) or armed
+
+		var edge := Color(1.6, 0.55, 1.15) if armed else Color(0.45, 1.5, 1.65)
+		if not usable:
+			edge = Color(0.30, 0.32, 0.44)
+		draw_rect(box.grow(-1.0), Color(0.055, 0.075, 0.185, 0.92))
+		draw_rect(box.grow(-1.0), edge, false, 2.0)
+
+		var ink := Color(1.25, 1.35, 1.5) if usable else Color(0.42, 0.44, 0.56)
+		# First word only. CRYSTAL BALL will not fit six-across on a phone, and
+		# an abbreviation beats a truncation that reads as a different tool.
+		var label: String = String(Tools.find_tool(id)["name"]).split(" ")[0]
+		var line_h := PixelFont.height(RACK_TEXT_SCALE)
+		PixelFont.draw_centered(
+			self, label, box.position.x + box.size.x * 0.5, box.position.y + 6.0,
+			RACK_TEXT_SCALE, ink,
+		)
+		PixelFont.draw_centered(
+			self, str(int(session.charges.get(id, 0))),
+			box.position.x + box.size.x * 0.5, box.position.y + 6.0 + line_h + 6.0,
+			RACK_TEXT_SCALE, ink,
+		)
+
+
+func _draw_prompt() -> void:
+	if _prompt.is_empty() or _board_view == null:
+		return
+	var scale := 2.0
+	var top: float = _board_view.position.y + _board_view.cell_size() * Rules.SIZE + 18.0
+	PixelFont.draw_centered(self, _prompt, size.x * 0.5, top, scale, Color(1.45, 1.02, 0.58))
 
 
 ## Rebuilt rather than updated in place: charges change on nearly every action,
@@ -203,43 +280,21 @@ func _rebuild_tools() -> void:
 		if not Tools.is_unlocked(tool_def, session.world_index):
 			continue
 		var id: String = tool_def["id"]
+		# Invisible: a hit target only. Its frame and label are drawn in _draw,
+		# the same way the control panel's keys are, so every piece of text on
+		# this screen goes through PixelFont rather than Godot's default sans.
 		var button := Button.new()
-		button.text = "%s %d" % [tool_def["name"], int(session.charges.get(id, 0))]
+		button.flat = true
 		button.focus_mode = Control.FOCUS_NONE
 		button.disabled = not session.can_use(id) and session.armed_tool != id
-		button.toggle_mode = true
-		button.button_pressed = session.armed_tool == id
 		button.tooltip_text = tool_def["description"]
-		button.add_theme_font_size_override("font_size", 11)
-		_style_key(button, session.armed_tool == id)
+		button.custom_minimum_size = Vector2(RACK_KEY_WIDTH, _rack_height())
+		button.size = button.custom_minimum_size
+		button.set_meta("tool_id", id)
 		button.pressed.connect(_on_tool_pressed.bind(id))
 		_tool_bar.add_child(button)
 
-
-## The rack's neon key look, applied to every state a Button has. Godot falls
-## back to its default grey theme for any state left unset, so a key that looks
-## right at rest turns into a stock button the moment it is hovered or held —
-## all five have to be given, not just `normal`.
-func _style_key(button: Button, armed: bool) -> void:
-	var edge := Color(1.6, 0.55, 1.15) if armed else Color(0.45, 1.5, 1.65)
-	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
-		var box := StyleBoxFlat.new()
-		box.bg_color = Color(0.06, 0.08, 0.19, 0.92)
-		box.set_border_width_all(2)
-		box.border_color = edge
-		box.set_corner_radius_all(7)
-		box.content_margin_left = 8.0
-		box.content_margin_right = 8.0
-		if state == "pressed" or state == "hover":
-			box.bg_color = Color(0.12, 0.14, 0.30, 0.95)
-		if state == "disabled":
-			box.border_color = Color(0.30, 0.32, 0.44)
-			box.bg_color = Color(0.05, 0.05, 0.11, 0.85)
-		button.add_theme_stylebox_override(state, box)
-	button.add_theme_color_override("font_color", Color(1.25, 1.35, 1.5))
-	button.add_theme_color_override("font_disabled_color", Color(0.42, 0.44, 0.56))
-	button.add_theme_color_override("font_hover_color", Color(1.5, 1.55, 1.7))
-	button.add_theme_color_override("font_pressed_color", Color(1.5, 1.55, 1.7))
+	_layout_rack()
 
 
 ## Targeted tools arm and wait for a board tap; the rest fire immediately.
@@ -301,6 +356,8 @@ func _on_finished(won: bool) -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.075, 0.058, 0.155))
+	_draw_rack()
+	_draw_prompt()
 	# Behind everything. The board draws its own share — see board_view._draw_stars
 	# — so the field skips the grid here rather than painting under a fill that
 	# would hide it.

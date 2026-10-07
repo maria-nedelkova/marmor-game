@@ -40,7 +40,7 @@ func test_a_world_opens_with_a_live_session() -> void:
 func test_the_rack_matches_the_worlds_unlocks() -> void:
 	for index in [0, 1, 5, Worlds.COUNT - 1]:
 		var scene := _world(index)
-		var rack: HBoxContainer = scene._tool_bar
+		var rack: Control = scene._tool_bar
 		assert_int(rack.get_child_count()) \
 			.override_failure_message("world %d showed %d tools" % [index + 1, rack.get_child_count()]) \
 			.is_equal(Tools.unlocked_at(index).size())
@@ -209,14 +209,14 @@ func test_arming_then_tapping_the_board_uses_the_tool() -> void:
 ## it has to appear and clear with the armed state.
 func test_the_prompt_appears_while_armed_and_clears_after() -> void:
 	var scene := _world(1)
-	assert_str(scene._prompt_label.text).is_empty()
+	assert_str(scene._prompt).is_empty()
 
 	_rack_button(scene, Tools.HAMMER).pressed.emit()
-	assert_str(scene._prompt_label.text).is_not_empty()
+	assert_str(scene._prompt).is_not_empty()
 
 	var occupied: Array[Vector2i] = scene.session.board.occupied_cells()
 	scene._board_view.cell_tapped.emit(occupied[0])
-	assert_str(scene._prompt_label.text).is_empty()
+	assert_str(scene._prompt).is_empty()
 	scene.queue_free()
 
 
