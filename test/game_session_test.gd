@@ -344,3 +344,177 @@ func test_finishing_reports_the_outcome_once() -> void:
 	s.tap(Board.cell(0, 0))
 	s.tap(Board.cell(4, 6))
 	assert_array(outcomes).is_equal([true])
+
+
+# --- arming targeted tools ---------------------------------------------------
+
+
+func test_only_targeted_tools_can_be_armed() -> void:
+	assert_bool(GameSession.is_targeted(Tools.HAMMER)).is_true()
+	assert_bool(GameSession.is_targeted(Tools.BOMB)).is_true()
+	assert_bool(GameSession.is_targeted(Tools.SWAP)).is_true()
+	assert_bool(GameSession.is_targeted(Tools.REROLL)).is_false()
+	assert_bool(GameSession.is_targeted(Tools.SHUFFLE)).is_false()
+	assert_bool(GameSession.is_targeted(Tools.FORESIGHT)).is_false()
+
+
+func test_arming_a_targetless_or_locked_tool_is_refused() -> void:
+	var s := _empty_session(5)
+	assert_bool(s.arm(Tools.REROLL)).is_false()
+	assert_bool(s.arm("teleporter")).is_false()
+	assert_bool(s.is_armed()).is_false()
+
+	var early := _empty_session(0)
+	assert_bool(early.arm(Tools.HAMMER)).is_false()
+
+
+## Arming must not leave a marble highlighted — that is precisely the tap the
+## player did not mean to make.
+func test_arming_cancels_a_marble_selection() -> void:
+	var s := _empty_session(1)
+	_place(s, [[4, 4]], 1)
+	s.tap(Board.cell(4, 4))
+	assert_bool(s.has_selection()).is_true()
+
+	assert_bool(s.arm(Tools.HAMMER)).is_true()
+	assert_bool(s.has_selection()).is_false()
+	assert_str(s.armed_tool).is_equal(Tools.HAMMER)
+
+
+func test_an_armed_hammer_smashes_instead_of_selecting() -> void:
+	var s := _empty_session(1)
+	_place(s, [[4, 4]], 1)
+	s.arm(Tools.HAMMER)
+	assert_str(s.tap(Board.cell(4, 4))).is_equal("tool")
+	assert_bool(s.board.is_empty_at(4, 4)).is_true()
+	assert_bool(s.is_armed()).is_false()
+	assert_int(s.charges[Tools.HAMMER]).is_equal(0)
+
+
+## A tap the tool cannot act on costs nothing, so it must not cost the arming
+## either — otherwise a misdirected tap makes the player re-arm.
+func test_a_tap_the_tool_cannot_act_on_stays_armed() -> void:
+	var s := _empty_session(1)
+	_place(s, [[4, 4]], 1)
+	s.arm(Tools.HAMMER)
+	assert_str(s.tap(Board.cell(0, 0))).is_equal("none")
+	assert_bool(s.is_armed()).is_true()
+	assert_int(s.charges[Tools.HAMMER]).is_equal(1)
+	# And it still works afterwards.
+	assert_str(s.tap(Board.cell(4, 4))).is_equal("tool")
+
+
+func test_disarming_restores_normal_tapping() -> void:
+	var s := _empty_session(1)
+	_place(s, [[4, 4]], 1)
+	s.arm(Tools.HAMMER)
+	s.disarm()
+	assert_bool(s.is_armed()).is_false()
+	assert_str(s.tap(Board.cell(4, 4))).is_equal("select")
+	assert_int(s.board.at(4, 4)).is_equal(1)
+
+
+func test_an_armed_bomb_clears_a_patch_around_the_tap() -> void:
+	var s := _empty_session(5)
+	for r in range(3, 6):
+		for c in range(3, 6):
+			s.board.set_at(r, c, 1)
+	s.arm(Tools.BOMB)
+	assert_str(s.tap(Board.cell(4, 4))).is_equal("tool")
+	assert_int(s.board.marble_count()).is_equal(0)
+	assert_bool(s.is_armed()).is_false()
+
+
+func test_the_flask_takes_two_taps() -> void:
+	var s := _empty_session(2)
+	_place(s, [[1, 1]], 2)
+	_place(s, [[5, 5]], 4)
+	s.arm(Tools.SWAP)
+
+	assert_str(s.tap(Board.cell(1, 1))).is_equal("arm_second")
+	assert_vector(s.swap_first).is_equal(Board.cell(1, 1))
+	assert_bool(s.is_armed()).is_true()
+	assert_int(s.charges[Tools.SWAP]).is_equal(1)
+
+	assert_str(s.tap(Board.cell(5, 5))).is_equal("tool")
+	assert_int(s.board.at(1, 1)).is_equal(4)
+	assert_int(s.board.at(5, 5)).is_equal(2)
+	assert_bool(s.is_armed()).is_false()
+	assert_int(s.charges[Tools.SWAP]).is_equal(0)
+
+
+func test_the_flask_takes_back_a_first_pick_tapped_again() -> void:
+	var s := _empty_session(2)
+	_place(s, [[1, 1]], 2)
+	s.arm(Tools.SWAP)
+	s.tap(Board.cell(1, 1))
+	assert_str(s.tap(Board.cell(1, 1))).is_equal("arm_second")
+	assert_int(s.swap_first.x).is_equal(-1)
+	assert_bool(s.is_armed()).is_true()
+
+
+func test_the_flask_ignores_empty_cells_for_its_first_pick() -> void:
+	var s := _empty_session(2)
+	_place(s, [[1, 1]], 2)
+	s.arm(Tools.SWAP)
+	assert_str(s.tap(Board.cell(7, 7))).is_equal("none")
+	assert_int(s.swap_first.x).is_equal(-1)
+
+
+## Two marbles of one colour is a no-op, so it keeps both the charge and the
+## first pick rather than silently resetting.
+func test_the_flask_refuses_two_marbles_of_one_colour_and_stays_armed() -> void:
+	var s := _empty_session(2)
+	_place(s, [[1, 1], [5, 5]], 3)
+	_place(s, [[7, 7]], 6)
+	s.arm(Tools.SWAP)
+	s.tap(Board.cell(1, 1))
+	assert_str(s.tap(Board.cell(5, 5))).is_equal("none")
+	assert_bool(s.is_armed()).is_true()
+	assert_vector(s.swap_first).is_equal(Board.cell(1, 1))
+	assert_int(s.charges[Tools.SWAP]).is_equal(1)
+	# A different colour then works.
+	assert_str(s.tap(Board.cell(7, 7))).is_equal("tool")
+
+
+func test_reaching_for_a_targetless_tool_cancels_the_armed_one() -> void:
+	var s := _empty_session(4)
+	_place(s, [[0, 0], [1, 1]], 1)
+	_place(s, [[2, 2]], 5)
+	s.arm(Tools.HAMMER)
+	assert_bool(s.is_armed()).is_true()
+	s.use_tool(Tools.SHUFFLE)
+	assert_bool(s.is_armed()).is_false()
+
+
+func test_the_prompt_says_what_the_board_is_waiting_for() -> void:
+	var s := _empty_session(2)
+	assert_str(s.prompt()).is_empty()
+
+	s.arm(Tools.HAMMER)
+	assert_str(s.prompt()).contains("smash")
+
+	s.disarm()
+	_place(s, [[1, 1]], 2)
+	s.arm(Tools.SWAP)
+	assert_str(s.prompt()).contains("first")
+	s.tap(Board.cell(1, 1))
+	assert_str(s.prompt()).contains("swap it with")
+
+
+func test_arming_reports_itself() -> void:
+	var s := _empty_session(1)
+	var seen: Array = []
+	s.armed_changed.connect(func(id: String) -> void: seen.append(id))
+	s.arm(Tools.HAMMER)
+	s.disarm()
+	assert_array(seen).is_equal([Tools.HAMMER, ""])
+
+
+func test_a_tool_cannot_be_armed_without_a_charge() -> void:
+	var s := _empty_session(1)
+	_place(s, [[3, 3], [4, 4]], 2)
+	s.arm(Tools.HAMMER)
+	s.tap(Board.cell(3, 3))
+	assert_bool(s.arm(Tools.HAMMER)).is_false()
+	assert_bool(s.is_armed()).is_false()

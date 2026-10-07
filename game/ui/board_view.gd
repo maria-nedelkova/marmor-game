@@ -114,6 +114,17 @@ func _draw() -> void:
 	if session.has_selection():
 		draw_circle(cell_center(session.selected), s * 0.46, Color(1.0, 1.0, 1.0, 0.18))
 
+	# The flask's first pick, in the prompt's own colour so the board and the
+	# line of text asking for a second marble read as one instruction.
+	if session.swap_first.x != -1:
+		draw_arc(cell_center(session.swap_first), s * 0.46, 0.0, TAU, 40, Color(0.98, 0.72, 0.42), 3.0)
+
+	# An armed tool tints the whole grid, so there is no way to be holding the
+	# hammer without noticing. A rack button alone is too easy to lose track of
+	# when the board is where you are looking.
+	if session.is_armed():
+		draw_rect(Rect2(origin, Vector2(side, side)), Color(0.98, 0.72, 0.42, 0.06))
+
 	for r in Rules.SIZE:
 		for c in Rules.SIZE:
 			var color_index := session.board.at(r, c)

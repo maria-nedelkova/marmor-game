@@ -18,6 +18,7 @@ var _title: Button
 var _score_label: Label
 var _queue_label: Label
 var _status_label: Label
+var _prompt_label: Label
 var _tool_bar: HBoxContainer
 
 
@@ -31,6 +32,7 @@ func start(index: int) -> void:
 	session = GameSession.new(index)
 	session.score_changed.connect(_refresh)
 	session.queue_changed.connect(func(_colors: Array[int]) -> void: _refresh())
+	session.armed_changed.connect(func(_id: String) -> void: _refresh())
 	session.finished.connect(_on_finished)
 	if _board_view != null:
 		_board_view.set_session(session)
@@ -55,6 +57,9 @@ func _build() -> void:
 	_score_label = _make_label(Color(0.92, 0.95, 1.0), 18)
 	_queue_label = _make_label(Color(0.62, 0.72, 0.92), 14)
 	_status_label = _make_label(Color(1.0, 0.85, 0.55), 20)
+	# Reserved whether or not a tool is armed, so arming one does not shove the
+	# board up a line.
+	_prompt_label = _make_label(Color(0.98, 0.72, 0.42), 14)
 
 	_board_view = Control.new()
 	_board_view.set_script(BoardViewScript)
@@ -88,6 +93,8 @@ func _layout() -> void:
 	_score_label.size = Vector2(w, 24.0)
 	_queue_label.position = Vector2(0.0, 72.0)
 	_queue_label.size = Vector2(w, 20.0)
+	_prompt_label.position = Vector2(0.0, size.y - 92.0)
+	_prompt_label.size = Vector2(w, 20.0)
 
 	# The board takes the square middle; the rack sits under it.
 	var top := 100.0
@@ -114,6 +121,7 @@ func _refresh() -> void:
 		names.append(str(color))
 	_queue_label.text = "next up:  %s" % ", ".join(names)
 
+	_prompt_label.text = session.prompt()
 	_rebuild_tools()
 	if _board_view != null:
 		_board_view.queue_redraw()
@@ -122,7 +130,13 @@ func _refresh() -> void:
 ## Rebuilt rather than updated in place: charges change on nearly every action,
 ## and six buttons is far too few for the churn to matter.
 func _rebuild_tools() -> void:
+	# remove_child BEFORE queue_free. queue_free is deferred to the end of the
+	# frame, so freeing alone leaves the old buttons attached while the new ones
+	# are added — a doubled rack for a frame, and anything reading the rack in
+	# between (a test, or a second refresh in the same frame) sees stale
+	# buttons with stale charges on them.
 	for child in _tool_bar.get_children():
+		_tool_bar.remove_child(child)
 		child.queue_free()
 
 	for tool_def in Tools.TOOLS:
@@ -132,17 +146,25 @@ func _rebuild_tools() -> void:
 		var button := Button.new()
 		button.text = "%s %d" % [tool_def["name"], int(session.charges.get(id, 0))]
 		button.focus_mode = Control.FOCUS_NONE
-		button.disabled = not session.can_use(id)
+		button.disabled = not session.can_use(id) and session.armed_tool != id
+		button.toggle_mode = true
+		button.button_pressed = session.armed_tool == id
 		button.tooltip_text = tool_def["description"]
 		button.pressed.connect(_on_tool_pressed.bind(id))
 		_tool_bar.add_child(button)
 
 
-## Only the two targetless tools are wired up here. The hammer, bomb and flask
-## need a board target, which means an armed state and a second tap — that is
-## the next piece of UI, not a missing rule: GameSession.use_tool_at already
-## implements all three and is tested.
+## Targeted tools arm and wait for a board tap; the rest fire immediately.
+## Pressing the armed tool again cancels it, which is the only way to back out
+## without spending the charge — a stray board tap deliberately does not.
 func _on_tool_pressed(tool_id: String) -> void:
+	if GameSession.is_targeted(tool_id):
+		if session.armed_tool == tool_id:
+			session.disarm()
+		else:
+			session.arm(tool_id)
+		_refresh()
+		return
 	if session.use_tool(tool_id):
 		_refresh()
 

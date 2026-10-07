@@ -28,6 +28,7 @@ signal cells_cleared(cells: Array[Vector2i], points: int)
 signal marbles_spawned(cells: Array[Vector2i])
 signal queue_changed(colors: Array[int])
 signal score_changed(score: int)
+signal armed_changed(tool_id: String)
 signal finished(won: bool)
 
 enum Phase { PLAYING, WON, LOST }
@@ -40,6 +41,16 @@ var phase: Phase = Phase.PLAYING
 var next_queue: Array[int] = []
 var charges: Dictionary = {}
 var selected: Vector2i = Vector2i(-1, -1)
+
+## The tool waiting for a board target, or "" for none.
+##
+## Armed state lives here rather than in the view because it changes what a tap
+## MEANS — the same tap on the same marble either selects it or smashes it. A
+## view that owned this would be making a rule, and the rule would then be
+## untestable without a scene.
+var armed_tool: String = ""
+## The flask's first pick, while it waits for a second.
+var swap_first: Vector2i = Vector2i(-1, -1)
 
 
 func _init(index: int) -> void:
@@ -68,11 +79,64 @@ func score_for(cell_count: int) -> int:
 	return MarmorEngine.score_for_clear(cell_count) * int(world["multiplier"])
 
 
+## Tools that need a board target. The rest resolve on tap, so arming them
+## would be a pointless extra step.
+const TARGETED: Array[String] = [Tools.HAMMER, Tools.BOMB, Tools.SWAP]
+
+
+static func is_targeted(tool_id: String) -> bool:
+	return TARGETED.has(tool_id)
+
+
+func is_armed() -> bool:
+	return armed_tool != ""
+
+
+## Arms a targeted tool. Arming cancels any marble selection: leaving one
+## highlighted while the hammer is live invites exactly the tap the player did
+## not mean to make.
+func arm(tool_id: String) -> bool:
+	if not is_targeted(tool_id) or not can_use(tool_id):
+		return false
+	armed_tool = tool_id
+	swap_first = Vector2i(-1, -1)
+	selected = Vector2i(-1, -1)
+	armed_changed.emit(armed_tool)
+	return true
+
+
+func disarm() -> void:
+	if not is_armed():
+		return
+	armed_tool = ""
+	swap_first = Vector2i(-1, -1)
+	armed_changed.emit("")
+
+
+## What the board is waiting for, for the view to show. Empty when nothing is
+## armed.
+func prompt() -> String:
+	match armed_tool:
+		Tools.HAMMER:
+			return "Tap a marble to smash it."
+		Tools.BOMB:
+			return "Tap anywhere to blow a hole."
+		Tools.SWAP:
+			if swap_first.x == -1:
+				return "Tap the first of two marbles to swap."
+			return "Now tap the marble to swap it with."
+		_:
+			return ""
+
+
 ## Taps a cell. Returns what the tap did, so the view knows whether to animate:
-## "select", "deselect", "move", or "none".
+## "select", "deselect", "move", "arm_second", "tool", or "none".
 func tap(cell: Vector2i) -> String:
 	if phase != Phase.PLAYING or not Board.in_bounds(cell.x, cell.y):
 		return "none"
+
+	if is_armed():
+		return _tap_armed(cell)
 
 	# Tapping an occupied cell always selects it, even with something already
 	# selected. Requiring a deselect first means a misdirected tap costs two
@@ -93,6 +157,37 @@ func tap(cell: Vector2i) -> String:
 
 	_commit_move(path)
 	return "move"
+
+
+## A tap while a tool is armed.
+##
+## A tap that the tool cannot act on — the hammer on empty space, the flask on
+## two marbles of one colour — leaves the tool ARMED rather than disarming it.
+## No charge was spent, so disarming would punish a misdirected tap by making
+## the player re-arm, and the prompt is still on screen telling them what the
+## board wants. Cancelling is the rack button's job, not a stray tap's.
+func _tap_armed(cell: Vector2i) -> String:
+	if armed_tool == Tools.SWAP:
+		if swap_first.x == -1:
+			if board.is_empty_at(cell.x, cell.y):
+				return "none"
+			swap_first = cell
+			armed_changed.emit(armed_tool)
+			return "arm_second"
+		# Tapping the first pick again takes it back.
+		if cell == swap_first:
+			swap_first = Vector2i(-1, -1)
+			armed_changed.emit(armed_tool)
+			return "arm_second"
+		if not use_tool_at(Tools.SWAP, swap_first, cell):
+			return "none"
+		disarm()
+		return "tool"
+
+	if not use_tool_at(armed_tool, cell):
+		return "none"
+	disarm()
+	return "tool"
 
 
 func _commit_move(path: Array[Vector2i]) -> void:
@@ -227,6 +322,8 @@ func _spend(tool_id: String) -> void:
 func use_tool(tool_id: String) -> bool:
 	if not can_use(tool_id):
 		return false
+	# Reaching for a different tool cancels whatever was waiting for a target.
+	disarm()
 
 	match tool_id:
 		Tools.REROLL:

@@ -141,3 +141,84 @@ func test_the_router_opens_on_the_map_and_swaps_to_a_world_and_back() -> void:
 	assert_str(main._current.get_script().resource_path).is_equal("res://game/ui/level_map.gd")
 
 	main.queue_free()
+
+
+# --- arming through the rack -----------------------------------------------
+
+
+func _rack_button(scene: Control, tool_id: String) -> Button:
+	var defs := Tools.unlocked_at(scene.session.world_index)
+	for i in defs.size():
+		if defs[i]["id"] == tool_id:
+			return scene._tool_bar.get_child(i) as Button
+	return null
+
+
+func test_pressing_a_targeted_tool_arms_it_rather_than_firing_it() -> void:
+	var scene := _world(1)
+	_rack_button(scene, Tools.HAMMER).pressed.emit()
+	assert_str(scene.session.armed_tool).is_equal(Tools.HAMMER)
+	# Nothing spent yet — arming is free.
+	assert_int(scene.session.charges[Tools.HAMMER]).is_equal(1)
+	scene.queue_free()
+
+
+func test_pressing_the_armed_tool_again_cancels_it() -> void:
+	var scene := _world(1)
+	_rack_button(scene, Tools.HAMMER).pressed.emit()
+	scene._rebuild_tools()
+	_rack_button(scene, Tools.HAMMER).pressed.emit()
+	assert_bool(scene.session.is_armed()).is_false()
+	assert_int(scene.session.charges[Tools.HAMMER]).is_equal(1)
+	scene.queue_free()
+
+
+func test_a_targetless_tool_still_fires_immediately() -> void:
+	var scene := _world(3)
+	_rack_button(scene, Tools.REROLL).pressed.emit()
+	assert_bool(scene.session.is_armed()).is_false()
+	assert_int(scene.session.charges[Tools.REROLL]).is_equal(0)
+	scene.queue_free()
+
+
+func test_arming_then_tapping_the_board_uses_the_tool() -> void:
+	var scene := _world(1)
+	var occupied: Array[Vector2i] = scene.session.board.occupied_cells()
+	var before: int = scene.session.board.marble_count()
+
+	_rack_button(scene, Tools.HAMMER).pressed.emit()
+	scene._board_view.cell_tapped.emit(occupied[0])
+
+	assert_int(scene.session.board.marble_count()).is_equal(before - 1)
+	assert_bool(scene.session.is_armed()).is_false()
+	assert_int(scene.session.charges[Tools.HAMMER]).is_equal(0)
+	scene.queue_free()
+
+
+## The prompt is what tells the player the board is waiting for something, so
+## it has to appear and clear with the armed state.
+func test_the_prompt_appears_while_armed_and_clears_after() -> void:
+	var scene := _world(1)
+	assert_str(scene._prompt_label.text).is_empty()
+
+	_rack_button(scene, Tools.HAMMER).pressed.emit()
+	assert_str(scene._prompt_label.text).is_not_empty()
+
+	var occupied: Array[Vector2i] = scene.session.board.occupied_cells()
+	scene._board_view.cell_tapped.emit(occupied[0])
+	assert_str(scene._prompt_label.text).is_empty()
+	scene.queue_free()
+
+
+## A spent tool must not stay selectable just because it was armed.
+func test_a_tool_with_no_charges_left_cannot_be_rearmed() -> void:
+	var scene := _world(1)
+	var occupied: Array[Vector2i] = scene.session.board.occupied_cells()
+	_rack_button(scene, Tools.HAMMER).pressed.emit()
+	scene._board_view.cell_tapped.emit(occupied[0])
+	scene._refresh()
+
+	_rack_button(scene, Tools.HAMMER).pressed.emit()
+	assert_bool(scene.session.is_armed()).is_false()
+	assert_bool(_rack_button(scene, Tools.HAMMER).disabled).is_true()
+	scene.queue_free()

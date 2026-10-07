@@ -33,6 +33,13 @@ func _ready() -> void:
 				if not MarmorEngine.find_path(session.board, occupied[0], to).is_empty():
 					session.tap(to)
 					break
+		# Arm the flask and make its first pick, so the shot shows the armed
+		# board tint, the first-pick ring and the prompt together.
+		if session.can_use(Tools.SWAP):
+			session.arm(Tools.SWAP)
+			var marbles = session.board.occupied_cells()
+			if marbles.size() > 0:
+				session.tap(marbles[0])
 		screen._refresh()
 		for _i in 4:
 			await get_tree().process_frame
