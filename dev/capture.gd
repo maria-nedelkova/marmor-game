@@ -62,11 +62,16 @@ func _ready() -> void:
 				session.tap(to)
 				break
 	view.settle()
-	if session.can_use(Tools.SWAP):
-		session.arm(Tools.SWAP)
+	if which.ends_with(":sel") or which == "select":
+		# Just a selection, so the selected-cell highlight is what shows.
 		var marbles = session.board.occupied_cells()
 		if marbles.size() > 0:
 			session.tap(marbles[0])
+	elif session.can_use(Tools.SWAP):
+		session.arm(Tools.SWAP)
+		var marbles2 = session.board.occupied_cells()
+		if marbles2.size() > 0:
+			session.tap(marbles2[0])
 	screen._refresh()
 	await _shoot()
 

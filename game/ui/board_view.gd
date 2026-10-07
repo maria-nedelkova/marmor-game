@@ -65,6 +65,13 @@ const BOARD_BG := Color(0.10, 0.07, 0.19)
 ## clipped to flat white, so a red marble and a blue one had identical white
 ## dots on them.
 const HIGHLIGHT_GAIN := 1.18
+## The selected cell, from the web's `.cell.selected`:
+##   background: #182055;  box-shadow: inset 0 0 0 3px var(--mr-accent)
+## with --mr-accent #29f1ff. The CELL is lit, not the marble — a ring behind
+## the marble reads as a halo the marble owns, where a filled cell reads as the
+## square being picked, which is what a move actually selects.
+const SELECTED_FILL := Color(0.094, 0.125, 0.333)
+const SELECTED_EDGE := Color(0.21, 1.42, 1.50)
 const ARMED_TINT := Color(1.45, 1.02, 0.58)
 ## The full-board armed wash, deliberately BELOW the glow threshold while
 ## ARMED_TINT above it is above. A wash is meant to be noticed and not looked
@@ -225,6 +232,13 @@ func cell_at(point: Vector2) -> Vector2i:
 	return Board.cell(r, c)
 
 
+## The square a cell occupies, for anything that lights the cell rather than
+## what is standing on it.
+func cell_rect(cell: Vector2i) -> Rect2:
+	var s := cell_size()
+	return Rect2(board_origin() + Vector2(cell.y * s, cell.x * s), Vector2(s, s))
+
+
 func cell_center(cell: Vector2i) -> Vector2:
 	var s := cell_size()
 	return board_origin() + Vector2((cell.y + 0.5) * s, (cell.x + 0.5) * s)
@@ -266,9 +280,11 @@ func _draw() -> void:
 	_draw_grid(origin, s, side)
 	_draw_frame(origin, side)
 
-	# Selection ring under the marble, so the marble stays fully legible.
+	# The selected CELL, filled and edged — not a ring around the marble.
 	if session.has_selection() and not is_busy():
-		draw_circle(cell_center(session.selected), s * 0.46, Color(1.6, 1.6, 1.7, 0.22))
+		var box := cell_rect(session.selected)
+		draw_rect(box, SELECTED_FILL)
+		draw_rect(box, SELECTED_EDGE, false, 3.0)
 
 	# The flask's first pick, in the prompt's colour so the board and the line
 	# of text asking for a second marble read as one instruction.
