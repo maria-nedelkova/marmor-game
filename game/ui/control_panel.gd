@@ -168,43 +168,63 @@ func _draw_marble(centre: Vector2, radius: float, color_index: int) -> void:
 func _draw_ornaments() -> void:
 	var key := key_size()
 	var inset := (size.y - key) * 0.5
-	# Inside the frame, in the two bands between a key and the queue.
-	var left := key + inset + 6.0
-	var right := size.x - key - inset - 6.0
+	# The two bands between a key and the queue. Everything is placed INTO one
+	# of these rather than scattered across the panel and then discarded for
+	# landing in the middle — that version threw away more than half of them,
+	# which is why the panel looked bare rather than decorated.
+	var queue_half := _queue_width() * 0.5
+	var bands := [
+		Vector2(key + inset + 10.0, size.x * 0.5 - queue_half - 10.0),
+		Vector2(size.x * 0.5 + queue_half + 10.0, size.x - key - inset - 10.0),
+	]
 
 	for o in _ornaments:
+		var band: Vector2 = bands[o["side"]]
+		if band.y - band.x < 12.0:
+			continue  # no room on this side at this width
 		var at := Vector2(
-			lerpf(left, right, o["x"]),
-			lerpf(10.0, size.y - 10.0, o["y"]),
+			lerpf(band.x, band.y, o["x"]),
+			lerpf(12.0, size.y - 12.0, o["y"]),
 		)
-		# The middle is the queue's, so anything that lands there is pushed out
-		# to whichever side it started nearest.
-		if o["x"] > 0.28 and o["x"] < 0.72:
-			continue
 		if o["heart"]:
 			_draw_heart(at, o["size"], o["tint"])
 		else:
 			_draw_sparkle(at, o["size"], o["tint"])
 
 
-## Scattered, not set at four tidy corners. Four ornaments at the corners read
-## as a border treatment; jittered sizes and positions read as decoration
-## someone placed. Seeded, so the scatter is the same every launch — decoration
-## that moves between redraws is noise.
+## How wide the next-up queue is, so the decoration can keep clear of it.
+func _queue_width() -> float:
+	if session == null or session.next_queue.is_empty():
+		return 0.0
+	var count := session.next_queue.size()
+	var diameter := (size.x / float(Rules.SIZE)) * QUEUE_SCALE
+	return count * diameter + (count - 1) * 22.0
+
+
+## Scattered, not set at four tidy corners — four ornaments at the corners read
+## as a border treatment, where jittered sizes and positions read as decoration
+## someone placed.
+##
+## Each is assigned a SIDE up front and then placed within that side's band, so
+## both sides get a fair share and none is thrown away. Seeded, so the scatter
+## is the same every launch: decoration that moves between redraws is noise.
 func _seed_ornaments() -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 5150
+	rng.seed = 90210
 	var tints: Array[Color] = [
 		Color(1.75, 1.45, 0.55), Color(0.70, 1.70, 1.90),
 		Color(1.80, 0.50, 1.20), Color(1.55, 1.60, 1.85),
 	]
 	_ornaments.clear()
-	for _i in 14:
+	for i in 12:
 		_ornaments.append({
+			# Alternating rather than random, so neither band can come out
+			# empty on a given seed.
+			"side": i % 2,
 			"x": rng.randf(),
 			"y": rng.randf(),
-			"size": rng.randf_range(3.5, 7.5),
-			"heart": rng.randf() < 0.35,
+			"size": rng.randf_range(3.0, 7.0),
+			"heart": rng.randf() < 0.4,
 			"tint": tints[rng.randi_range(0, tints.size() - 1)],
 		})
 
