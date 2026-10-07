@@ -24,7 +24,9 @@ const TINTS: Array[Color] = [
 ## Builds a fixed field. Seeded, because stars that move between redraws read as
 ## static — and because the same seed gives the same sky every launch, which is
 ## what makes it feel like a place.
-static func build(seed_value: int, count: int, sparkles: int, constellations: int) -> Array[Dictionary]:
+static func build(
+	seed_value: int, count: int, sparkles: int, constellations: int, diagonals: int = 0
+) -> Array[Dictionary]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	var out: Array[Dictionary] = []
@@ -54,7 +56,29 @@ static func build(seed_value: int, count: int, sparkles: int, constellations: in
 				"sparkle": false,
 			})
 
+	# Diagonal chains: stars strung along a slanted line, each a little
+	# different in size and alpha. Constellations cluster; these streak, and
+	# the two together stop the field reading as one texture repeated.
+	for _d in diagonals:
+		var from := Vector2(rng.randf(), rng.randf())
+		var angle := rng.randf_range(0.5, 1.1) * (1.0 if rng.randf() < 0.5 else -1.0)
+		var step := rng.randf_range(0.018, 0.034)
+		var direction := Vector2(cos(angle), sin(angle))
+		var tint: Color = TINTS[rng.randi_range(0, TINTS.size() - 1)]
+		for m in rng.randi_range(4, 8):
+			var at := from + direction * step * float(m)
+			if at.x < 0.0 or at.x > 1.0 or at.y < 0.0 or at.y > 1.0:
+				break
+			out.append({
+				"pos": at,
+				"radius": rng.randf_range(0.8, 2.6),
+				"alpha": rng.randf_range(0.35, 1.0),
+				"tint": tint if rng.randf() < 0.7 else TINTS[rng.randi_range(0, TINTS.size() - 1)],
+				"sparkle": rng.randf() < 0.18,
+			})
+
 	for _s in sparkles:
+
 		out.append({
 			"pos": Vector2(rng.randf(), rng.randf()),
 			"radius": rng.randf_range(3.0, 5.5),

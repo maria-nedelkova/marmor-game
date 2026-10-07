@@ -109,7 +109,7 @@ func _ready() -> void:
 ## constellations. See starfield.gd on why a uniform scatter of white dots
 ## reads as noise rather than as sky.
 func _seed_stars() -> void:
-	_stars = Starfield.build(424242, 130, 6, 5)
+	_stars = Starfield.build(424242, 250, 13, 11, 9)
 
 
 ## The title doubles as the way back here from a world — tapping the game name

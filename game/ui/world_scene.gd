@@ -53,7 +53,10 @@ func start(index: int) -> void:
 
 func _build() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	_stars = Starfield.build(8080, 150, 7, 5)
+	# Counts are high because the board masks roughly two thirds of the screen:
+	# stars are kept off it, so only the bands above and below it ever show, and
+	# a count that looks right across the whole rect looks sparse in those bands.
+	_stars = Starfield.build(8080, 340, 16, 14, 11)
 
 	# "LEVEL 6" over "TERRA-FORMER" in a stepped neon plaque. Also the way back
 	# to the map, as on the web.

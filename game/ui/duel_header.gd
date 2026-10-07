@@ -56,23 +56,28 @@ func _draw() -> void:
 		KING_EDGE_TOP, KING_EDGE_BOTTOM, KING_TEXT,
 	)
 
+	# Centred under their own badge rather than pinned to the edge, so each
+	# mascot and the number it owns read as one column.
+	var left_centre := 6.0 + BADGE_SIZE.x * 0.5
+	var right_centre := size.x - 6.0 - BADGE_SIZE.x * 0.5
+
 	var pretender := Pretender.texture()
 	if pretender != null:
 		PixelSprite.draw_scaled(
 			self, pretender,
-			Rect2(Vector2(10.0, mascot_y), Vector2(MASCOT_SIZE, MASCOT_SIZE)),
+			Rect2(Vector2(left_centre - MASCOT_SIZE * 0.5, mascot_y), Vector2(MASCOT_SIZE, MASCOT_SIZE)),
 		)
 	var king := Kings.texture_for(session.world["id"])
 	if king != null:
 		PixelSprite.draw_scaled(
 			self, king,
-			Rect2(Vector2(size.x - MASCOT_SIZE - 10.0, mascot_y), Vector2(MASCOT_SIZE, MASCOT_SIZE)),
+			Rect2(Vector2(right_centre - MASCOT_SIZE * 0.5, mascot_y), Vector2(MASCOT_SIZE, MASCOT_SIZE)),
 		)
 
 	# The bar runs between the mascots, level with their heads.
 	# Clear of the mascots by a wide margin: they are the thing worth looking
 	# at here, and the bar was eating the room they need.
-	var left := MASCOT_SIZE + 34.0
+	var left := maxf(MASCOT_SIZE, BADGE_SIZE.x) + 26.0
 	_draw_bar(Rect2(
 		Vector2(left, mascot_y + MASCOT_SIZE * 0.5 - BAR_HEIGHT * 0.5),
 		Vector2(maxf(0.0, size.x - left * 2.0), BAR_HEIGHT),

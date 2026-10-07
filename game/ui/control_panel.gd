@@ -23,21 +23,27 @@ const PANEL_FILL := Color(0.055, 0.075, 0.185, 0.92)
 const ICON := Color(1.45, 1.50, 1.60)
 const CORNER_RADIUS := 14.0
 
-const KEY_SIZE := 52.0
+## Keys are sized off the board's cell — a touch larger than one, so a key is
+## never smaller than the thing it sits under. Computed rather than fixed for
+## the same reason the queue is: the panel takes the board's width, so the
+## board's cell is panel width / 9.
+const KEY_OVERSIZE := 1.12
 ## Queue marbles are drawn at the BOARD's marble size, not a fixed one. The
 ## panel is set to the board's width, so the board's cell is panel width / 9 —
 ## which means the queue can match the board without being told the board's
 ## geometry. A fixed size drifted every time the board's sizing changed.
-const QUEUE_SCALE := 0.74
+const QUEUE_SCALE := 0.88
 
 var session: GameSession
 var muted := false
 
+var _ornaments: Array[Dictionary] = []
 var _restart: Button
 var _sound: Button
 
 
 func _ready() -> void:
+	_seed_ornaments()
 	_restart = _make_key("Restart this world")
 	_restart.pressed.connect(func() -> void: restart_pressed.emit())
 
@@ -59,8 +65,7 @@ func _make_key(tip: String) -> Button:
 	button.flat = true
 	button.focus_mode = Control.FOCUS_NONE
 	button.tooltip_text = tip
-	button.custom_minimum_size = Vector2(KEY_SIZE, KEY_SIZE)
-	button.size = button.custom_minimum_size
+	# Size is set in _layout, which knows the panel width the cell derives from.
 	add_child(button)
 	return button
 
@@ -70,13 +75,23 @@ func set_session(new_session: GameSession) -> void:
 	queue_redraw()
 
 
+func key_size() -> float:
+	var cell := size.x / float(Rules.SIZE)
+	return minf(size.y - 16.0, cell * KEY_OVERSIZE)
+
+
 func _layout() -> void:
 	if _restart == null:
 		return
-	var inset := 10.0
-	var mid := size.y * 0.5 - KEY_SIZE * 0.5
-	_restart.position = Vector2(inset, mid)
-	_sound.position = Vector2(size.x - KEY_SIZE - inset, mid)
+	var key := key_size()
+	# The same gap left and right as above and below, so a key sits in a square
+	# of clear space rather than being pushed toward the ends.
+	var inset := (size.y - key) * 0.5
+	for button in [_restart, _sound]:
+		button.custom_minimum_size = Vector2(key, key)
+		button.size = Vector2(key, key)
+	_restart.position = Vector2(inset, inset)
+	_sound.position = Vector2(size.x - key - inset, inset)
 	queue_redraw()
 
 
@@ -150,14 +165,48 @@ func _draw_marble(centre: Vector2, radius: float, color_index: int) -> void:
 ## does — four identical corners read as a border treatment, where two of each
 ## on crossing diagonals reads as decoration someone placed.
 func _draw_ornaments() -> void:
-	var inset := Vector2(72.0, 16.0)
-	var right := size.x - inset.x
-	var low := size.y - inset.y
+	var key := key_size()
+	var inset := (size.y - key) * 0.5
+	# Inside the frame, in the two bands between a key and the queue.
+	var left := key + inset + 6.0
+	var right := size.x - key - inset - 6.0
 
-	_draw_sparkle(Vector2(inset.x, inset.y), 6.0, Color(1.75, 1.45, 0.55))
-	_draw_sparkle(Vector2(right, low), 6.0, Color(0.70, 1.70, 1.90))
-	_draw_heart(Vector2(inset.x, low), 5.0, Color(1.80, 0.50, 1.20))
-	_draw_heart(Vector2(right, inset.y), 5.0, Color(1.80, 0.50, 1.20))
+	for o in _ornaments:
+		var at := Vector2(
+			lerpf(left, right, o["x"]),
+			lerpf(10.0, size.y - 10.0, o["y"]),
+		)
+		# The middle is the queue's, so anything that lands there is pushed out
+		# to whichever side it started nearest.
+		if o["x"] > 0.28 and o["x"] < 0.72:
+			continue
+		if o["heart"]:
+			_draw_heart(at, o["size"], o["tint"])
+		else:
+			_draw_sparkle(at, o["size"], o["tint"])
+
+
+## Scattered, not set at four tidy corners. Four ornaments at the corners read
+## as a border treatment; jittered sizes and positions read as decoration
+## someone placed. Seeded, so the scatter is the same every launch — decoration
+## that moves between redraws is noise.
+func _seed_ornaments() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5150
+	var tints: Array[Color] = [
+		Color(1.75, 1.45, 0.55), Color(0.70, 1.70, 1.90),
+		Color(1.80, 0.50, 1.20), Color(1.55, 1.60, 1.85),
+	]
+	_ornaments.clear()
+	for _i in 14:
+		_ornaments.append({
+			"x": rng.randf(),
+			"y": rng.randf(),
+			"size": rng.randf_range(3.5, 7.5),
+			"heart": rng.randf() < 0.35,
+			"tint": tints[rng.randi_range(0, tints.size() - 1)],
+		})
+
 
 
 ## A filled rhomb, not a cross of thin arms. At this size a thin cross is
