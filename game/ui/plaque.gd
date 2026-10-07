@@ -63,19 +63,18 @@ const MIN_WIDTH := 210.0
 ## glyph pixels cover two screen pixels and their neighbours cover one, and the
 ## letters come out visibly uneven, which is the one thing pixel art cannot
 ## afford.
-const LEVEL_SCALE_MAX := 3
-const LEVEL_SCALE_MIN := 2
-## The two lines are the same size now, and the hierarchy comes from colour and
-## order instead of from scale. That is also what the reference does — STARRY
-## and MARMORS are set at one size there, with the layout doing the work.
+const LEVEL_SCALE_MAX := 4
+const LEVEL_SCALE_MIN := 3
+## The name sits two steps under the level line rather than one. At scale 3 it
+## competed with LEVEL N for the eye; at 2 the pair reads as a heading with a
+## subtitle, which is what it is.
 ##
-## Scales are integers (see the note above), so "level a little smaller, name a
-## little bigger" has exactly one landing place between 4 and 2: both at 3.
-##
-## Headroom check, since the floor is only one step down: the longest name is
-## CELESTIAL RING STATION at 22 characters, which is 393px at scale 3 against
-## roughly 600px of available width — and it can still drop to 2 below that.
-const NAME_SCALE_MAX := 3
+## Headroom check, since the shrink loop can no longer do much: the longest
+## name is CELESTIAL RING STATION at 22 characters, which is 262px at scale 2
+## against roughly 600px of available width. If names ever grow past about 45
+## characters the floor needs lowering again, or the plaque will overflow
+## rather than shrink.
+const NAME_SCALE_MAX := 2
 const NAME_SCALE_MIN := 2
 
 const FILL := Color(0.043, 0.035, 0.125)
