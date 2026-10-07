@@ -114,7 +114,7 @@ func _layout() -> void:
 	var panel_margin := 22.0
 	var rack_height := 42.0
 
-	var plaque_height := 88.0
+	var plaque_height := 112.0
 	_title.position = Vector2(0.0, 6.0)
 	_title.size = Vector2(w, plaque_height)
 
