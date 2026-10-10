@@ -45,6 +45,10 @@ const NODE_RADIUS := 42.0
 ## Planets are drawn at a whole multiple of their 16px art — 4x — so the pixel
 ## grid stays square. See PixelSprite.draw_scaled.
 const PLANET_SIZE := 64.0
+## Supplied art holds the planet AND its king in one image, so it is drawn
+## larger than a planet alone — it has to cover the ground both of them used
+## to. Still a whole multiple of a 32px source.
+const WORLD_ART_SIZE := 96.0
 ## The king hangs off the planet's upper right, the way the reference sets its
 ## avatars beside each world rather than on top of them.
 ##
@@ -355,6 +359,9 @@ func _draw_ribbon(from: Vector2, to: Vector2, tint: Color, reached: bool) -> voi
 ## most of what makes a map worth looking at.
 func _draw_king(index: int) -> void:
 	var world := Worlds.get_world(index)
+	# Supplied art already contains the king; drawing one here would double him.
+	if WorldArt.has(world["id"]):
+		return
 	var texture := Kings.texture_for(world["id"])
 	if texture == null:
 		return
@@ -370,21 +377,41 @@ func _draw_king(index: int) -> void:
 ## Locked worlds are dimmed with modulate rather than a second palette: the art
 ## is the same art, and eight more colour sets would be eight more things to
 ## keep in step.
+## Supplied art wins when there is any. Those files hold the planet AND its
+## king in one image, so when one is present the map skips its own king layer
+## for that world — which is what lets the set be replaced one world at a time
+## rather than all eight at once.
 func _draw_planet(index: int) -> void:
 	var centre := _node_center(index)
-	var texture := Planets.texture_for(Worlds.get_world(index)["id"])
+	var world_id: String = Worlds.get_world(index)["id"]
+	var unlocked := progress.is_unlocked(index)
+	var dim := Color.WHITE if unlocked else Color(0.44, 0.46, 0.56, 0.9)
+
+	var supplied := WorldArt.texture_for(world_id)
+	if supplied != null:
+		var art_box := Rect2(
+			centre - Vector2(WORLD_ART_SIZE, WORLD_ART_SIZE) * 0.5,
+			Vector2(WORLD_ART_SIZE, WORLD_ART_SIZE),
+		)
+		PixelSprite.draw_scaled(self, supplied, art_box, dim)
+		if index == Worlds.COUNT - 1:
+			_draw_final_ring(centre, unlocked, WORLD_ART_SIZE)
+		return
+
+	var texture := Planets.texture_for(world_id)
 	if texture == null:
 		return
-	var unlocked := progress.is_unlocked(index)
 	var box := Rect2(
 		centre - Vector2(PLANET_SIZE, PLANET_SIZE) * 0.5, Vector2(PLANET_SIZE, PLANET_SIZE)
 	)
-	PixelSprite.draw_scaled(
-		self, texture, box, Color.WHITE if unlocked else Color(0.44, 0.46, 0.56, 0.9)
-	)
-
-	# The final world gets a ring, so GALACTIC CORE reads as a destination
-	# rather than as the eighth of eight.
+	PixelSprite.draw_scaled(self, texture, box, dim)
 	if index == Worlds.COUNT - 1:
-		var ring := Color(1.7, 0.55, 1.25, 0.95) if unlocked else Color(0.45, 0.18, 0.34, 0.5)
-		draw_arc(centre, PLANET_SIZE * 0.5 + 10.0, 0.0, TAU, 48, ring, 2.5)
+		_draw_final_ring(centre, unlocked, PLANET_SIZE)
+
+
+## GALACTIC CORE gets a ring, so it reads as a destination rather than as the
+## eighth of eight. Sized from whichever art is being drawn, since supplied art
+## covers more ground than the planet alone.
+func _draw_final_ring(centre: Vector2, unlocked: bool, art_size: float) -> void:
+	var ring := Color(1.7, 0.55, 1.25, 0.95) if unlocked else Color(0.45, 0.18, 0.34, 0.5)
+	draw_arc(centre, art_size * 0.5 + 8.0, 0.0, TAU, 48, ring, 2.5)

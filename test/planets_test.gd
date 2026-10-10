@@ -64,3 +64,35 @@ func test_a_sprite_builds_into_a_texture_of_the_right_size() -> void:
 
 func test_an_unknown_world_has_no_planet() -> void:
 	assert_object(Planets.texture_for("atlantis")).is_null()
+
+
+# --- supplied art ------------------------------------------------------------
+
+
+## With no files dropped in, every world falls back to its authored sprites.
+## This is the state the repo ships in, so it is the one most likely to break
+## unnoticed when the loader changes.
+func test_with_no_supplied_art_every_world_falls_back() -> void:
+	for i in Worlds.COUNT:
+		var id: String = Worlds.get_world(i)["id"]
+		if WorldArt.has(id):
+			continue  # a file has been added for this world; nothing to assert
+		assert_object(Planets.texture_for(id)) \
+			.override_failure_message("%s has neither supplied nor authored art" % id) \
+			.is_not_null()
+
+
+## Asking for a world that does not exist must be null, not an error — the
+## loader is given ids from save data, which can name a world that was removed.
+func test_supplied_art_for_an_unknown_world_is_null() -> void:
+	assert_object(WorldArt.texture_for("atlantis")).is_null()
+	assert_bool(WorldArt.has("atlantis")).is_false()
+
+
+## `missing()` is what tells you how far a part-finished swap has got.
+func test_missing_lists_worlds_still_on_authored_art() -> void:
+	var missing := WorldArt.missing()
+	for id in missing:
+		assert_bool(WorldArt.has(id)) \
+			.override_failure_message("%s is listed as missing but has art" % id).is_false()
+	assert_int(missing.size()).is_less_equal(Worlds.COUNT)
