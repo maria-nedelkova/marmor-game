@@ -41,20 +41,10 @@ const LAYOUT: Array[Vector2] = [
 	Vector2(0.48, 0.87),
 ]
 
-## Per-world planet colours, matched to the king each world guards (see the
-## `king` field in worlds.gd).
-const PLANET_COLORS: Array[Color] = [
-	Color(0.36, 0.95, 0.60),  # NEONIA-1, green
-	Color(0.98, 0.78, 0.25),  # SULFUR-KOR, sulfur yellow
-	Color(0.72, 0.48, 0.98),  # CRYSTALLOS, violet crystal
-	Color(0.18, 0.16, 0.26),  # BLACK HOLE 04, near-black
-	Color(0.85, 0.87, 0.95),  # CELESTIAL RING STATION, steel
-	Color(0.35, 0.78, 0.95),  # TERRA-FORMER, ocean blue
-	Color(0.45, 0.92, 0.70),  # GAIA PRIME, living green
-	Color(0.98, 0.35, 0.72),  # GALACTIC CORE, hot pink
-]
-
 const NODE_RADIUS := 42.0
+## Planets are drawn at a whole multiple of their 16px art — 4x — so the pixel
+## grid stays square. See PixelSprite.draw_scaled.
+const PLANET_SIZE := 64.0
 ## The king hangs off the planet's upper right, the way the reference sets its
 ## avatars beside each world rather than on top of them.
 ##
@@ -68,15 +58,6 @@ const KING_SIZE := 48.0
 ## final world's ring (NODE_RADIUS + 12) ended up drawn across its own name.
 const LABEL_TOP_GAP := 18.0
 const LOCKED_TINT := Color(0.32, 0.34, 0.44)
-## How far past the glow threshold (1.0) a lit element is pushed. Everything
-## that should bloom is multiplied by this; everything that should not is left
-## under 1.0.
-##
-## Kept low. At 1.7 a bright planet clipped to flat white and lost its own
-## colour entirely — the glow around it was green while the disc itself was a
-## white hole. Just over the threshold is enough to bloom while still reading
-## as the colour it is.
-const HDR_GAIN := 1.22
 
 var progress: PlayerProgress
 var _nodes: Array[Control] = []
@@ -85,6 +66,8 @@ var _header: Array[Label] = []
 ## Rectangles the route must not drop dots inside — the node labels. Rebuilt on
 ## every layout, because they move with the viewport.
 var _label_zones: Array[Rect2] = []
+## Soft colour behind the stars. Built once and kept, like the field itself.
+var _nebula: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -99,6 +82,7 @@ func _ready() -> void:
 			progress.save()
 
 	_seed_stars()
+	_seed_nebula()
 	_build_header()
 	_build_nodes()
 	resized.connect(_layout_nodes)
@@ -110,6 +94,50 @@ func _ready() -> void:
 ## reads as noise rather than as sky.
 func _seed_stars() -> void:
 	_stars = Starfield.build(424242, 250, 13, 11, 9)
+
+
+## Clouds of colour behind the stars, which is what separates the reference's
+## sky from a black rectangle with dots on it.
+##
+## Each is a stack of widening translucent discs rather than one disc: a single
+## translucent circle has a visible edge no matter how faint it is, and an edge
+## is exactly what a nebula must not have. Stacking them lets the falloff do
+## the work.
+##
+## Seeded, so the sky is the same place every launch.
+func _seed_nebula() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 31415
+	var tints: Array[Color] = [
+		Color(0.42, 0.18, 0.62),
+		Color(0.16, 0.26, 0.68),
+		Color(0.62, 0.16, 0.48),
+		Color(0.14, 0.34, 0.54),
+	]
+	_nebula.clear()
+	for i in 7:
+		_nebula.append({
+			"pos": Vector2(rng.randf(), rng.randf()),
+			"radius": rng.randf_range(0.18, 0.40),
+			"tint": tints[i % tints.size()],
+			"strength": rng.randf_range(0.10, 0.20),
+		})
+
+
+func _draw_nebula() -> void:
+	var span := maxf(size.x, size.y)
+	for cloud in _nebula:
+		var centre: Vector2 = (cloud["pos"] as Vector2) * size
+		var radius: float = cloud["radius"] * span
+		var tint: Color = cloud["tint"]
+		var strength: float = cloud["strength"]
+		for shell in 6:
+			var t := float(shell) / 5.0
+			draw_circle(
+				centre,
+				radius * (0.35 + t * 0.65),
+				Color(tint.r, tint.g, tint.b, strength * (1.0 - t) * 0.5),
+			)
 
 
 ## The title doubles as the way back here from a world — tapping the game name
@@ -254,7 +282,8 @@ func _is_on_a_label(point: Vector2) -> bool:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.075, 0.058, 0.155))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.045, 0.035, 0.10))
+	_draw_nebula()
 
 	_label_zones.clear()
 	for i in Worlds.COUNT:
@@ -271,37 +300,52 @@ func _draw() -> void:
 		var from := _node_center(i)
 		var to := _node_center(i + 1)
 		var reached := progress.is_unlocked(i + 1)
-		var tint := Color(1.5, 0.70, 1.25, 0.9) if reached else Color(0.72, 0.72, 0.92, 0.55)
-		_draw_dotted(from, to, tint, reached)
+		var tint := Color(1.55, 0.52, 1.15, 0.95) if reached else Color(0.46, 0.40, 0.62, 0.55)
+		_draw_ribbon(from, to, tint, reached)
 
 	for i in Worlds.COUNT:
 		_draw_planet(i)
 		_draw_king(i)
 
 
-## Dots rather than a solid stroke — the reference uses them, and they keep the
-## line from reading as a wall between the halves of the map.
-func _draw_dotted(from: Vector2, to: Vector2, tint: Color, reached: bool) -> void:
+## A wavy pink ribbon between two worlds, as the reference draws its route.
+##
+## The wave is perpendicular to the line and tapers to nothing at both ends, so
+## consecutive segments meet cleanly at each planet instead of arriving at an
+## angle. Without the taper the route visibly kinks at every node.
+##
+## Drawn as a polyline rather than dots: the reference's path is continuous,
+## and a dotted line reads as "not yet travelled" where a solid one reads as a
+## road.
+func _draw_ribbon(from: Vector2, to: Vector2, tint: Color, reached: bool) -> void:
 	var span := to - from
 	var length := span.length()
 	if length < 1.0:
 		return
-	var step := 13.0
-	var dots := int(length / step)
 	var dir := span / length
-	# Start and end clear of the planets so the dots do not run under them.
-	for d in range(1, dots):
-		var at := from + dir * (d * step)
-		if at.distance_to(from) < NODE_RADIUS + 10.0:
-			continue
-		if at.distance_to(to) < NODE_RADIUS + 10.0:
-			continue
-		# A dot sitting on a world's name reads as a typo rather than as a
-		# route. Leaving a gap is cheaper, and less fragile, than rerouting the
-		# line around the text.
-		if _is_on_a_label(at):
-			continue
-		draw_circle(at, 2.6 if reached else 2.0, tint)
+	var normal := Vector2(-dir.y, dir.x)
+
+	# Start and end clear of the planets, so the ribbon runs between them
+	# rather than under them.
+	var clearance := PLANET_SIZE * 0.5 + 6.0
+	if length <= clearance * 2.0:
+		return
+	var start := from + dir * clearance
+	var finish := to - dir * clearance
+	var run := start.distance_to(finish)
+
+	var steps := maxi(10, int(run / 7.0))
+	var amplitude := clampf(run * 0.10, 6.0, 20.0)
+	var waves := maxf(1.0, round(run / 90.0))
+
+	var points := PackedVector2Array()
+	for i in steps + 1:
+		var t := float(i) / float(steps)
+		# sin(PI * t) is the taper: zero at both ends, widest in the middle.
+		var swing := sin(TAU * waves * t) * amplitude * sin(PI * t)
+		points.append(start.lerp(finish, t) + normal * swing)
+
+	draw_polyline(points, tint, 5.0 if reached else 3.0, true)
 
 
 ## The world's king, hung off the planet's upper right.
@@ -321,36 +365,26 @@ func _draw_king(index: int) -> void:
 	PixelSprite.draw_scaled(self, texture, box, tint)
 
 
+## The world itself, as pixel art rather than a drawn disc.
+##
+## Locked worlds are dimmed with modulate rather than a second palette: the art
+## is the same art, and eight more colour sets would be eight more things to
+## keep in step.
 func _draw_planet(index: int) -> void:
 	var centre := _node_center(index)
-	var unlocked: bool = progress.is_unlocked(index)
-	var base: Color = PLANET_COLORS[index]
-	if not unlocked:
-		base = base.lerp(LOCKED_TINT, 0.45)
-
-	draw_circle(centre, NODE_RADIUS, base.darkened(0.45))
-	draw_circle(centre, NODE_RADIUS - 3.0, base)
-
-	# Above 1.0 on purpose: this is what the WorldEnvironment's glow picks up,
-	# and it replaces the three stacked translucent discs that used to fake a
-	# halo here. Real bloom spreads from the bright pixels themselves, so the
-	# halo follows the planet's own colour and the terminator between lit and
-	# unlit edge instead of being a uniform ring painted around it.
-	#
-	# Locked worlds stay BELOW the threshold, which is why they read as dim
-	# without needing a separate dimming pass — they simply never bloom.
-	if unlocked:
-		var hot := Color(base.r * HDR_GAIN, base.g * HDR_GAIN, base.b * HDR_GAIN)
-		draw_circle(centre, NODE_RADIUS - 6.0, hot)
-
-	# Offset highlight, so the disc reads as a sphere rather than a dot.
-	var lit := base.lightened(0.35)
-	if unlocked:
-		lit = Color(lit.r * HDR_GAIN, lit.g * HDR_GAIN, lit.b * HDR_GAIN)
-	draw_circle(centre + Vector2(-NODE_RADIUS * 0.28, -NODE_RADIUS * 0.28), NODE_RADIUS * 0.42, lit)
+	var texture := Planets.texture_for(Worlds.get_world(index)["id"])
+	if texture == null:
+		return
+	var unlocked := progress.is_unlocked(index)
+	var box := Rect2(
+		centre - Vector2(PLANET_SIZE, PLANET_SIZE) * 0.5, Vector2(PLANET_SIZE, PLANET_SIZE)
+	)
+	PixelSprite.draw_scaled(
+		self, texture, box, Color.WHITE if unlocked else Color(0.44, 0.46, 0.56, 0.9)
+	)
 
 	# The final world gets a ring, so GALACTIC CORE reads as a destination
 	# rather than as the eighth of eight.
 	if index == Worlds.COUNT - 1:
 		var ring := Color(1.7, 0.55, 1.25, 0.95) if unlocked else Color(0.45, 0.18, 0.34, 0.5)
-		draw_arc(centre, NODE_RADIUS + 12.0, 0.0, TAU, 48, ring, 2.5)
+		draw_arc(centre, PLANET_SIZE * 0.5 + 10.0, 0.0, TAU, 48, ring, 2.5)
